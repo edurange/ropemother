@@ -1,0 +1,19 @@
+#!/usr/bin/env python3
+# ropemother/service/__main__.py
+
+"""Command-line entry point for the local message bus broker."""
+
+import sys
+
+from ropemother.service.broker import main
+
+__author__ = "Joe Granville"
+__email__ = "874605+jwgranville@users.noreply.github.com"
+__date__ = "2026-06-29T19:11:49+00:00"
+__license__ = "MIT"
+__version__ = "0.1.0.dev1"
+__status__ = "Development"
+
+
+if __name__ == "__main__":
+    sys.exit(main())
