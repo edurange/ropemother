@@ -6,36 +6,40 @@ The direct broker is useful for local development, teaching, demos, and early in
 
 This preview does not claim to provide distributed consensus, production broker deployment, complete replay orchestration, or archive-level storage integration. It focuses on the local message model, capture behavior, request/reply helpers, and readable examples that can be used while the broader service architecture is still taking shape.
 
-## Using the preview archive
+## Using the source checkout
 
-This preview is distributed as a source archive. Extract it into a workspace directory:
+Clone the repository into a workspace directory:
+
+```sh
+git clone https://github.com/edurange/ropemother.git
+cd ropemother
+```
+
+Run preview commands from the repository root:
+
+```sh
+python -m ropemother.playground
+```
+
+Use the same working-directory setup for small scripts kept in the checkout:
+
+```sh
+python my_example.py
+```
+
+If an example also imports a companion source tree such as `intarsia`, keep the repositories next to each other and add the companion tree to `PYTHONPATH`:
 
 ```text
 workspace/
     ropemother/
-        ropemother/
-        README.md
+    intarsia/
 ```
-
-Run commands from the `workspace` directory with the `ropemother` source tree on `PYTHONPATH`:
 
 ```sh
-PYTHONPATH="$PWD/ropemother:$PWD" python -m ropemother.playground
+PYTHONPATH="$PWD:../intarsia" python my_example.py
 ```
 
-Use the same path setup for small scripts:
-
-```sh
-PYTHONPATH="$PWD/ropemother:$PWD" python my_example.py
-```
-
-If an example also imports a companion source tree such as `intarsia`, add that source tree to `PYTHONPATH` as well:
-
-```sh
-PYTHONPATH="$PWD/ropemother:$PWD/intarsia:$PWD" python my_example.py
-```
-
-The freestanding broker uses the same source-path setup. Its startup and client commands are shown later in this README.
+The freestanding broker uses the same source-checkout setup. Its startup and client commands are shown later in this README.
 
 ## Publish and subscribe
 
