@@ -44,7 +44,7 @@ from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:06:12+00:00"
+__date__ = "2026-07-09T20:21:25+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -129,7 +129,7 @@ class AsyncDirectMessageBus(AsyncMessageBus):
     def capture_source(self) -> CaptureRecordSource | None:
         return self._core.capture_source()
 
-    def format_registry(self) -> PortableFormatRegistry:
+    def _format_registry(self) -> PortableFormatRegistry:
         return self._core.format_registry()
 
     @classmethod
