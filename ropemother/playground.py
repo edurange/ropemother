@@ -40,6 +40,7 @@ from ropemother.capture.historyservice import (
     HistoryService,
 )
 from ropemother.capture.memorysink import InMemoryCaptureSink
+from ropemother.capture.runtime import history_for
 from ropemother.capture.sink import CaptureSink
 from ropemother.capture.writer import RegistrationRecord
 from ropemother.client.asyncrequest import (
@@ -67,6 +68,8 @@ from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
+    PortableFormat,
+    PortableFormatKey,
     RAW_BYTES_PORTABLE_FORMAT,
 )
 from ropemother.format.registry import (
@@ -143,6 +146,7 @@ from ropemother.transport.sessionrunner import BrokerTransportSessionRunner
 from ropemother.transport.socketconnection import SocketFrameConnection
 from ropemother.transport.zeromq.connection import ZMQFrameConnection
 from ropemother.util.onelinejson import oneline_deserialize, oneline_serialize
+from ropemother.util.serializer import IDENTITY_SERIALIZER, IdentityAdapter
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
@@ -159,6 +163,12 @@ DEMO_ALT_MSG_TYPE = "event-quux"
 DEMO_RESERVED_TOPIC = "bus.foo"
 DEMO_LIFECYCLE_TOPIC = "lifecycle.foo"
 DEMO_LIFECYCLE_TYPE = LifecycleMessageType.STARTED.value
+
+DEMO_CUSTOM_BYTES_FORMAT = PortableFormat[bytes, bytes](
+    key=PortableFormatKey.from_str("demo-custom-bytes"),
+    adapter=IdentityAdapter[bytes](),
+    serializer=IDENTITY_SERIALIZER,
+)
 
 CapturedRecord = (
     CapturedMessage
@@ -6979,6 +6989,87 @@ def demo_local_message_bus_host_broker_history() -> None:
     print("\n")
 
 
+def demo_history_for_shares_live_format_registry() -> None:
+    print("Demo: history_for shares live format registry")
+    bus = DirectMessageBus(capture_sink=InMemoryCaptureSink())
+    history = history_for(bus)
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+        payload_format=DEMO_CUSTOM_BYTES_FORMAT,
+    )
+    canonical_payload = b"foo bar"
+    emitter.emit(canonical_payload)
+
+    page = history.select(
+        msg_topic=DEMO_TOPIC,
+        msg_type=DEMO_MSG_TYPE,
+        msg_producer=DEMO_PRODUCER,
+    )
+    recovered_payload = None
+    if len(page.entries) == 1:
+        recovered_payload = page.entries[0].payload
+
+    print(f"{canonical_payload=}")
+    print(f"{recovered_payload=}")
+    success = recovered_payload == canonical_payload
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("recovered_payload " + eq_string + " canonical_payload")
+
+    print(f"({history_for.__name__}): ", end="")
+    if success:
+        print("Live history used a later registered payload format")
+    else:
+        print("Live history did not recover the custom payload")
+    print("\n")
+
+
+def demo_jsonl_capture_history_uses_extra_formats() -> None:
+    print("Demo: JSONL capture history uses extra formats")
+    with TemporaryDirectory() as runtime_dir:
+        capture_path = Path(runtime_dir) / "capture.jsonl"
+        sink = JSONLinesCaptureSink(capture_path, append=False)
+        bus = DirectMessageBus(capture_sink=sink)
+        emitter = bus.register_emitter(
+            msg_topic=DEMO_TOPIC,
+            msg_producer=DEMO_PRODUCER,
+            msg_type=DEMO_MSG_TYPE,
+            payload_format=DEMO_CUSTOM_BYTES_FORMAT,
+        )
+        canonical_payload = b"baz qux"
+        emitter.emit(canonical_payload)
+        history = JSONLinesCaptureHistory(
+            capture_path, extra_formats=(DEMO_CUSTOM_BYTES_FORMAT,)
+        )
+        page = history.select(
+            msg_topic=DEMO_TOPIC,
+            msg_type=DEMO_MSG_TYPE,
+            msg_producer=DEMO_PRODUCER,
+        )
+
+    recovered_payload = None
+    if len(page.entries) == 1:
+        recovered_payload = page.entries[0].payload
+
+    print(f"{canonical_payload=}")
+    print(f"{recovered_payload=}")
+    success = recovered_payload == canonical_payload
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("recovered_payload " + eq_string + " canonical_payload")
+
+    print(f"({JSONLinesCaptureHistory.__name__}): ", end="")
+    if success:
+        print("Offline history decoded a custom extra format")
+    else:
+        print("Offline history did not recover the custom payload")
+    print("\n")
+
+
 def main() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7078,6 +7169,8 @@ def main() -> None:
     demo_register_emitter_rejects_invalid_message_names()
     asyncio.run(demo_async_socket_service_history_facade())
     demo_local_message_bus_host_broker_history()
+    demo_history_for_shares_live_format_registry()
+    demo_jsonl_capture_history_uses_extra_formats()
 
 
 if __name__ == "__main__":
