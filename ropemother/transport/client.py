@@ -25,7 +25,10 @@ from ropemother.exceptions import (
     MessageBusBaseException,
     PayloadSerializationError,
 )
-from ropemother.format.formattable import PortableFormatTable
+from ropemother.format.formattable import (
+    PortableFormatTable,
+    PortableFormatTableError,
+)
 from ropemother.format.portableformat import (
     PortableFormat,
     JSON_PORTABLE_FORMAT,
@@ -68,7 +71,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T01:11:17+00:00"
+__date__ = "2026-07-09T04:56:51+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -91,6 +94,11 @@ class TransportRequestError(TransportClientError):
     def __init__(self, error_message: str, *, error_code: str) -> None:
         super().__init__(error_message)
         self.error_code = error_code
+
+
+class TransportPayloadDecodeError(ValueError, TransportClientError):
+    """Raised when a transport payload cannot be decoded locally."""
+    pass
 
 
 class TransportClient(MessageEndpointFactory):
@@ -312,8 +320,21 @@ class TransportClient(MessageEndpointFactory):
         self, frame: DeliveryFrame
     ) -> ReceivedMessage:
         format_key = self._registrations.format_key_for_id(frame.msg_format_id)
-        portable_format = self._format_table.from_key(format_key)
-        payload = portable_format.decode(frame.payload_bytes)
+        try:
+            portable_format = self._format_table.from_key(format_key)
+        except PortableFormatTableError as e:
+            raise TransportPayloadDecodeError(
+                "transport client has no local decoder for payload format "
+                f"{format_key.registration_key!r}"
+            ) from e
+
+        try:
+            payload = portable_format.decode(frame.payload_bytes)
+        except (TypeError, ValueError) as e:
+            raise TransportPayloadDecodeError(
+                "transport payload could not be decoded with format "
+                f"{format_key.registration_key!r}"
+            ) from e
 
         msg_topic = self._registrations.topic_for_id(frame.msg_topic_id)
         msg_type = self._registrations.msg_type_for_id(frame.msg_type_id)

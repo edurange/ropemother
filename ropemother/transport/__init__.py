@@ -8,7 +8,7 @@ from typing import Any
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-04T23:12:30+00:00"
+__date__ = "2026-07-09T04:58:43+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -30,6 +30,7 @@ _EXPORTS = {
     "SocketFrameConnectionError": "ropemother.transport.socketconnection",
     "TransportClient": "ropemother.transport.client",
     "TransportClientError": "ropemother.transport.client",
+    "TransportPayloadDecodeError": "ropemother.transport.client",
 }
 
 __all__ = list(_EXPORTS)

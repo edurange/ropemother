@@ -3,6 +3,11 @@
 
 """Record format conversion utilities."""
 
+from ropemother.format.formattable import (
+    LocalPortableFormatTable,
+    PortableFormatTable,
+    StaticPortableFormatTable,
+)
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
@@ -23,8 +28,11 @@ __status__ = "Development"
 __all__ = [
     "COMPOSITE_PORTABLE_FORMAT",
     "JSON_PORTABLE_FORMAT",
+    "LocalPortableFormatTable",
     "PortableFormat",
     "PortableFormatError",
     "PortableFormatKey",
+    "PortableFormatTable",
     "RAW_BYTES_PORTABLE_FORMAT",
+    "StaticPortableFormatTable",
 ]

@@ -3,6 +3,7 @@
 
 """Synchronous in-process broker and support classes, without transport."""
 
+from collections.abc import Iterable
 from queue import Empty, Queue
 from typing import Any, Self
 
@@ -114,6 +115,16 @@ class DirectMessageBus(MessageBus):
             delivery_target=receiver.delivery_target,
         )
         return receiver
+
+    def install_format(
+        self, payload_format: PortableFormat[Any, Any]
+    ) -> None:
+        self._core.install_format(payload_format)
+
+    def install_formats(
+        self, payload_formats: Iterable[PortableFormat[Any, Any]]
+    ) -> None:
+        self._core.install_formats(payload_formats)
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._core.set_capture_sink(capture_sink)

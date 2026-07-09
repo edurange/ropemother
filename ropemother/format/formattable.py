@@ -12,7 +12,7 @@ from ropemother.format.portableformat import PortableFormat, PortableFormatKey
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T07:38:08+00:00"
+__date__ = "2026-07-09T04:42:39+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -87,6 +87,15 @@ class LocalPortableFormatTable(PortableFormatTable):
             )
 
         self._formats[portable_format.key] = portable_format
+
+    def has_format_key(self, key: PortableFormatKey) -> bool:
+        return key in self._formats
+
+    def format_keys(self) -> tuple[PortableFormatKey, ...]:
+        return tuple(self._formats)
+
+    def formats(self) -> tuple[PortableFormat[Any, Any], ...]:
+        return tuple(self._formats.values())
 
     def from_key(self, key: PortableFormatKey) -> PortableFormat[Any, Any]:
         try:

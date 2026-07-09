@@ -4,6 +4,7 @@
 """Shared implementation for in-process brokers."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
 from time import monotonic_ns
@@ -69,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T02:56:26+00:00"
+__date__ = "2026-07-09T04:54:03+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -340,6 +341,16 @@ class DirectBrokerCore:
         format_id = self._ensure_format_id(payload_format)
         registration = self._format_registration_for(format_id)
         return (format_id, (registration,))
+
+    def install_format(
+        self, payload_format: PortableFormat[Any, Any]
+    ) -> None:
+        self._format_registry.install_format(payload_format)
+
+    def install_formats(
+        self, payload_formats: Iterable[PortableFormat[Any, Any]]
+    ) -> None:
+        self._format_registry.install_formats(payload_formats)
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._capture_controller.activate_capture_sink(

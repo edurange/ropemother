@@ -4,6 +4,7 @@
 """Asynchronous, in-process broker and support classes, without transport."""
 
 from asyncio import Queue, QueueEmpty
+from collections.abc import Iterable
 from typing import Any, Self
 
 from ropemother.bootstrap.buffer import BootstrapBufferLimits
@@ -43,7 +44,7 @@ from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T02:58:55+00:00"
+__date__ = "2026-07-09T04:54:53+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -109,6 +110,16 @@ class AsyncDirectMessageBus(AsyncMessageBus):
             delivery_target=receiver.delivery_target,
         )
         return receiver
+
+    def install_format(
+        self, payload_format: PortableFormat[Any, Any]
+    ) -> None:
+        self._core.install_format(payload_format)
+
+    def install_formats(
+        self, payload_formats: Iterable[PortableFormat[Any, Any]]
+    ) -> None:
+        self._core.install_formats(payload_formats)
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._core.set_capture_sink(capture_sink)

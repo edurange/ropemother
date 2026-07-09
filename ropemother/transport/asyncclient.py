@@ -14,7 +14,10 @@ from ropemother.broker.endpoints import (
 )
 from ropemother.client.asyncendpointprovisioner import AsyncEndpointProvisioner
 from ropemother.exceptions import PayloadSerializationError
-from ropemother.format.formattable import PortableFormatTable
+from ropemother.format.formattable import (
+    PortableFormatTable,
+    PortableFormatTableError,
+)
 from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
     PortableFormat,
@@ -37,6 +40,7 @@ from ropemother.message.typeformats import (
 )
 from ropemother.transport.asyncconnection import AsyncFrameChannel
 from ropemother.transport.client import (
+    TransportPayloadDecodeError,
     TransportRequestError,
     UnexpectedTransportFrameError,
 )
@@ -61,7 +65,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T01:11:49+00:00"
+__date__ = "2026-07-09T04:58:14+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -313,8 +317,21 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         self, frame: DeliveryFrame
     ) -> ReceivedMessage:
         format_key = self._registrations.format_key_for_id(frame.msg_format_id)
-        portable_format = self._format_table.from_key(format_key)
-        payload = portable_format.decode(frame.payload_bytes)
+        try:
+            portable_format = self._format_table.from_key(format_key)
+        except PortableFormatTableError as e:
+            raise TransportPayloadDecodeError(
+                "async transport client has no local decoder for payload "
+                f"format {format_key.registration_key!r}"
+            ) from e
+
+        try:
+            payload = portable_format.decode(frame.payload_bytes)
+        except (TypeError, ValueError) as e:
+            raise TransportPayloadDecodeError(
+                "async transport payload could not be decoded with format "
+                f"{format_key.registration_key!r}"
+            ) from e
 
         msg_topic = self._registrations.topic_for_id(frame.msg_topic_id)
         msg_type = self._registrations.msg_type_for_id(frame.msg_type_id)
