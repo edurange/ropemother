@@ -7,11 +7,8 @@ from typing import Any
 
 from ropemother.broker.directcore import BrokerDeliveryTarget, DirectBrokerCore
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import (
-    PortableFormat,
-    PortableFormatTable,
-    UnknownPortableFormatError,
-)
+from ropemother.format.formattable import UnknownPortableFormatError
+from ropemother.format.portableformat import PortableFormat
 from ropemother.message.records import (
     BusMessage,
     BusOperation,
@@ -39,7 +36,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:49:49+00:00"
+__date__ = "2026-07-09T16:34:43+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -49,19 +46,13 @@ class BrokerTransportSession:
     """Broker-side protocol session for one transport connection."""
     _channel: FrameChannel
     _core: DirectBrokerCore
-    _format_table: PortableFormatTable
     _state: TransportSessionState
 
     def __init__(
-        self,
-        *,
-        channel: FrameChannel,
-        core: DirectBrokerCore,
-        format_table: PortableFormatTable,
+        self, *, channel: FrameChannel, core: DirectBrokerCore
     ) -> None:
         self._channel = channel
         self._core = core
-        self._format_table = format_table
         self._state = TransportSessionState()
 
     def handle_next_frame(self) -> None:
@@ -89,7 +80,8 @@ class BrokerTransportSession:
         self, frame: RegisterEmitterFrame
     ) -> None:
         try:
-            payload_format = self._format_table.from_key(frame.format_key)
+            format_registry = self._core.format_registry()
+            payload_format = format_registry.from_key(frame.format_key)
             supported_type_formats = (
                 self._supported_type_formats_from_frame(frame)
             )
@@ -148,7 +140,8 @@ class BrokerTransportSession:
         self, frame: RegisterPayloadFormatFrame
     ) -> None:
         try:
-            payload_format = self._format_table.from_key(frame.format_key)
+            format_registry = self._core.format_registry()
+            payload_format = format_registry.from_key(frame.format_key)
         except UnknownPortableFormatError:
             key = frame.format_key.registration_key
             error_frame = TransportErrorFrame(
@@ -266,7 +259,7 @@ class BrokerTransportSession:
         supported_type_formats = {}
         for support in frame.supported_type_formats:
             formats = tuple(
-                self._format_table.from_key(format_key)
+                self._core.format_registry().from_key(format_key)
                 for format_key in support.format_keys
             )
             supported_type_formats[support.msg_type] = formats

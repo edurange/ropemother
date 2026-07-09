@@ -4,6 +4,7 @@
 """Asynchronous endpoint-side client facade for ropemother transport frames."""
 
 from collections import deque
+from collections.abc import Iterable
 from typing import Any
 
 from ropemother.broker.asyncendpoints import AsyncEmitter, AsyncReceiver
@@ -14,15 +15,13 @@ from ropemother.broker.endpoints import (
 )
 from ropemother.client.asyncendpointprovisioner import AsyncEndpointProvisioner
 from ropemother.exceptions import PayloadSerializationError
-from ropemother.format.formattable import (
-    PortableFormatTable,
-    PortableFormatTableError,
-)
+from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.formattable import PortableFormatTableError
 from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
     PortableFormat,
 )
-from ropemother.format.registry import PortableFormatID
+from ropemother.format.registry import PortableFormatID, PortableFormatRegistry
 from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, ReceivedMessage
 from ropemother.message.selectors import (
@@ -65,7 +64,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T04:58:14+00:00"
+__date__ = "2026-07-09T17:50:46+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -77,15 +76,20 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
     """Async endpoint factory backed by transport frames."""
     _channel: AsyncFrameChannel
     _delivery_queues: dict[TransportSubscriptionID, deque[DeliveryFrame]]
-    _format_table: PortableFormatTable
+    _format_registry: PortableFormatRegistry
     _registrations: EndpointRegistrationView
 
     def __init__(
-        self, *, channel: AsyncFrameChannel, format_table: PortableFormatTable
+        self,
+        *,
+        channel: AsyncFrameChannel,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     ) -> None:
         self._channel = channel
         self._delivery_queues = {}
-        self._format_table = format_table
+        self._format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
         self._registrations = EndpointRegistrationView()
 
     def close(self) -> None:
@@ -112,6 +116,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
             supported_type_formats=supported_type_formats,
             allow_unlisted_type_formats=allow_unlisted_type_formats,
         )
+        self._install_format_policy_formats(format_policy)
         type_format_support = _transport_type_format_support(format_policy)
         frame = RegisterEmitterFrame(
             msg_topic=msg_topic,
@@ -133,7 +138,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         emitter = AsyncTransportEmitter(
             client=self,
             channel=self._channel,
-            format_table=self._format_table,
+            format_registry=self._format_registry,
             registrations=self._registrations,
             msg_topic=msg_topic,
             msg_producer=msg_producer,
@@ -318,7 +323,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
     ) -> ReceivedMessage:
         format_key = self._registrations.format_key_for_id(frame.msg_format_id)
         try:
-            portable_format = self._format_table.from_key(format_key)
+            portable_format = self._format_registry.from_key(format_key)
         except PortableFormatTableError as e:
             raise TransportPayloadDecodeError(
                 "async transport client has no local decoder for payload "
@@ -350,12 +355,21 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         )
         return message
 
+    def _install_format_policy_formats(
+        self, format_policy: TypeFormatPolicy
+    ) -> None:
+        self._format_registry.install_format(
+            format_policy.default_payload_format
+        )
+        for support in format_policy.supported_type_formats.values():
+            self._format_registry.install_formats(support.supported_formats)
+
 
 class AsyncTransportEmitter(AsyncEmitter):
     """Async emitter backed by transport frames."""
     _client: AsyncTransportClient
     _channel: AsyncFrameChannel
-    _format_table: PortableFormatTable
+    _format_registry: PortableFormatRegistry
     _registrations: EndpointRegistrationView
     _msg_topic: str
     _msg_producer: str
@@ -368,7 +382,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         *,
         client: AsyncTransportClient,
         channel: AsyncFrameChannel,
-        format_table: PortableFormatTable,
+        format_registry: PortableFormatRegistry,
         registrations: EndpointRegistrationView,
         msg_topic: str,
         msg_producer: str,
@@ -378,7 +392,7 @@ class AsyncTransportEmitter(AsyncEmitter):
     ) -> None:
         self._client = client
         self._channel = channel
-        self._format_table = format_table
+        self._format_registry = format_registry
         self._registrations = registrations
         self._msg_topic = msg_topic
         self._msg_producer = msg_producer

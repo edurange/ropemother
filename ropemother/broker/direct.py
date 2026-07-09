@@ -26,11 +26,11 @@ from ropemother.client.request import (
     Requester,
     Responder,
 )
-from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     PortableFormat,
     JSON_PORTABLE_FORMAT,
 )
+from ropemother.format.registry import PortableFormatRegistry
 from ropemother.message.messageidentity import CorrelationID
 from ropemother.message.records import (
     BusMessage,
@@ -49,7 +49,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T02:58:04+00:00"
+__date__ = "2026-07-09T16:37:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -62,6 +62,7 @@ class DirectMessageBus(MessageBus):
     def __init__(
         self,
         *,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
     ) -> None:
@@ -72,6 +73,7 @@ class DirectMessageBus(MessageBus):
             capture_enabled=capture_mode.capture_enabled,
             bootstrap_enabled=bootstrap_enabled,
             capture_sink=capture_sink,
+            extra_formats=extra_formats,
         )
 
     def register_emitter(
@@ -132,16 +134,13 @@ class DirectMessageBus(MessageBus):
     def capture_source(self) -> CaptureRecordSource | None:
         return self._core.capture_source()
 
-    def format_table(self) -> PortableFormatTable:
-        return self._core.format_table()
+    def format_registry(self) -> PortableFormatRegistry:
+        return self._core.format_registry()
 
     def create_transport_session(
-        self, *, channel: FrameChannel, format_table: PortableFormatTable
+        self, *, channel: FrameChannel
     ) -> BrokerTransportSession:
-        session = BrokerTransportSession(
-            channel=channel, core=self._core, format_table=format_table
-        )
-        return session
+        return BrokerTransportSession(channel=channel, core=self._core)
 
     @classmethod
     def capture_bootstrap(

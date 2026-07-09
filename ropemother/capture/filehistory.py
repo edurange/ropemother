@@ -21,7 +21,7 @@ from ropemother.util.onelinejson import JSONRecord, oneline_deserialize
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T18:50:08+00:00"
+__date__ = "2026-07-09T17:23:38+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -199,12 +199,12 @@ class JSONLinesCaptureHistory(MessageHistory):
         path: str | Path,
         *,
         encoding: str = "utf-8",
-        format_table: PortableFormatTable | None = None,
+        format_registry: PortableFormatTable | None = None,
     ) -> None:
         self._source = _JSONLinesCaptureRecordSource(Path(path), encoding)
         self._history = InMemoryCaptureHistory(
             self._source,
-            format_table=format_table,
+            format_registry=format_registry,
         )
 
     @property

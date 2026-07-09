@@ -3,23 +3,23 @@
 
 """Environment-variable handoff for message bus contact details."""
 
+from collections.abc import Iterable, Mapping, MutableMapping
 import os
-from collections.abc import Mapping, MutableMapping
+from typing import Any
 
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import PortableFormatTable
+from ropemother.format.portableformat import PortableFormat
 from ropemother.service.connector import (
     connect_async_transport_client,
     connect_transport_client,
 )
-from ropemother.service.defaults import default_portable_format_table
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.transport.asyncclient import AsyncTransportClient
 from ropemother.transport.client import TransportClient
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-04T22:35:57+00:00"
+__date__ = "2026-07-09T17:41:15+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -90,16 +90,14 @@ def bus_contact_descriptor(
 
 def connect_client_from_bus_contact(
     *,
-    format_table: PortableFormatTable,
+    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     variables: Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> TransportClient:
     """Connect to the bus named by environment variables."""
-    descriptor = bus_contact_descriptor(
-        variables=variables, name=name
-    )
+    descriptor = bus_contact_descriptor(variables=variables, name=name)
     client = connect_transport_client(
-        descriptor=descriptor, format_table=format_table
+        descriptor=descriptor, extra_formats=extra_formats
     )
     return client
 
@@ -107,14 +105,11 @@ def connect_client_from_bus_contact(
 def connect_message_bus(
     descriptor: ConnectionDescriptor | str | None = None,
     *,
-    format_table: PortableFormatTable | None = None,
+    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     variables: Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> TransportClient:
     """Connect to a message bus from a descriptor or environment."""
-    if format_table is None:
-        format_table = default_portable_format_table()
-
     if descriptor is None:
         connection_descriptor = bus_contact_descriptor(
             variables=variables, name=name
@@ -125,23 +120,21 @@ def connect_message_bus(
         connection_descriptor = descriptor
 
     client = connect_transport_client(
-        descriptor=connection_descriptor, format_table=format_table
+        descriptor=connection_descriptor, extra_formats=extra_formats
     )
     return client
 
 
 async def connect_async_client_from_bus_contact(
     *,
-    format_table: PortableFormatTable,
+    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     variables: Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> AsyncTransportClient:
     """Connect asynchronously to the bus named by environment variables."""
-    descriptor = bus_contact_descriptor(
-        variables=variables, name=name
-    )
+    descriptor = bus_contact_descriptor(variables=variables, name=name)
     client = await connect_async_transport_client(
-        descriptor=descriptor, format_table=format_table
+        descriptor=descriptor, extra_formats=extra_formats
     )
     return client
 
@@ -149,14 +142,11 @@ async def connect_async_client_from_bus_contact(
 async def connect_async_message_bus(
     descriptor: ConnectionDescriptor | str | None = None,
     *,
-    format_table: PortableFormatTable | None = None,
+    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     variables: Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> AsyncTransportClient:
     """Connect asynchronously to a message bus using a URI descriptor."""
-    if format_table is None:
-        format_table = default_portable_format_table()
-
     if descriptor is None:
         connection_descriptor = bus_contact_descriptor(
             variables=variables, name=name
@@ -167,6 +157,6 @@ async def connect_async_message_bus(
         connection_descriptor = descriptor
 
     client = await connect_async_transport_client(
-        descriptor=connection_descriptor, format_table=format_table
+        descriptor=connection_descriptor, extra_formats=extra_formats
     )
     return client

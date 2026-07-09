@@ -17,7 +17,7 @@ from ropemother.format.formattable import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T04:45:32+00:00"
+__date__ = "2026-07-09T07:15:10+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -40,6 +40,18 @@ class InvalidFormatIDTypeError(TypeError, FormatRegistryError):
 
 class UnsupportedRegistrationTypeError(TypeError, FormatRegistryError):
     """Raised when a format registration has an unsupported shape."""
+    pass
+
+
+class UnknownPortableFormatIDError(LookupError, FormatRegistryError):
+    """Raised when a compact format ID is not registered locally."""
+    pass
+
+
+class ConflictingPortableFormatRegistrationError(
+    ValueError, FormatRegistryError
+):
+    """Raised when a compact format ID conflicts with known state."""
     pass
 
 
@@ -73,15 +85,18 @@ class PortableFormatRegistration:
 class PortableFormatRegistry(PortableFormatTable):
     """Registry that assigns compact IDs to portable payload formats."""
     _format_ids: dict[PortableFormatKey, PortableFormatID]
-    _formats: dict[PortableFormatID, PortableFormat[Any, Any]]
+    _format_keys: dict[PortableFormatID, PortableFormatKey]
     _registrations: list[PortableFormatRegistration]
     _local_formats: dict[PortableFormatKey, PortableFormat[Any, Any]]
 
-    def __init__(self) -> None:
+    def __init__(
+        self, *formats: PortableFormat[Any, Any]
+    ) -> None:
         self._format_ids = {}
-        self._formats = {}
+        self._format_keys = {}
         self._registrations = []
         self._local_formats = {}
+        self.install_formats(formats)
 
     def install_formats(
         self, formats: Iterable[PortableFormat[Any, Any]]
@@ -110,12 +125,10 @@ class PortableFormatRegistry(PortableFormatTable):
             registration = None
         else:
             format_id = PortableFormatID(len(self._format_ids))
-            self._format_ids[format_key] = format_id
-            self._formats[format_id] = self._local_formats[format_key]
             registration = PortableFormatRegistration(
                 format_id=format_id, key=format_key
             )
-            self._registrations.append(registration)
+            self.record_format_registration(registration)
         return format_id, registration
 
     def has_format_key(self, key: PortableFormatKey) -> bool:
@@ -130,10 +143,49 @@ class PortableFormatRegistry(PortableFormatTable):
     def registrations(self) -> tuple[PortableFormatRegistration, ...]:
         return tuple(self._registrations)
 
+    def record_format_registration(
+        self, registration: PortableFormatRegistration
+    ) -> None:
+        existing_key = self._format_keys.get(registration.format_id)
+        if existing_key is not None and existing_key != registration.key:
+            raise ConflictingPortableFormatRegistrationError(
+                "portable format ID conflicts with an existing key: "
+                f"{registration.format_id!r}"
+            )
+
+        existing_id = self._format_ids.get(registration.key)
+        if existing_id is not None and existing_id != registration.format_id:
+            raise ConflictingPortableFormatRegistrationError(
+                "portable format key conflicts with an existing ID: "
+                f"{registration.key.registration_key!r}"
+            )
+
+        if existing_key is None:
+            self._format_keys[registration.format_id] = registration.key
+            self._format_ids[registration.key] = registration.format_id
+            self._registrations.append(registration)
+
+    def format_key_for_id(
+        self, format_id: PortableFormatID
+    ) -> PortableFormatKey:
+        try:
+            format_key = self._format_keys[format_id]
+        except KeyError as error:
+            raise UnknownPortableFormatIDError(
+                f"unknown portable format ID: {format_id!r}"
+            ) from error
+        return format_key
+
+    def find_format_id_for_key(
+        self, format_key: PortableFormatKey
+    ) -> PortableFormatID | None:
+        return self._format_ids.get(format_key)
+
     def format_for_id(
         self, format_id: PortableFormatID
     ) -> PortableFormat[Any, Any]:
-        return self._formats[format_id]
+        format_key = self.format_key_for_id(format_id)
+        return self.from_key(format_key)
 
     def from_key(
         self, key: PortableFormatKey

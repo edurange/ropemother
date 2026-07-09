@@ -4,25 +4,26 @@
 """Host abstractions for message bus service lifecycles."""
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from threading import Thread
 from types import TracebackType
-from typing import Self
+from typing import Any, Self
 
 from ropemother.broker.direct import DirectMessageBus
 from ropemother.broker.directcore import CaptureMode
 from ropemother.capture.sink import CaptureSink
 from ropemother.client.endpointfactory import MessageEndpointFactory
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import PortableFormatTable
+from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.portableformat import PortableFormat
+from ropemother.format.registry import PortableFormatRegistry
 from ropemother.service.brokerextension import (
     BrokerExtension,
     BrokerExtensionRunner,
 )
 from ropemother.service.connector import connect_transport_client
-from ropemother.service.defaults import default_portable_format_table
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.service.environment import (
     BUS_CONTACT_URI_VARIABLE,
@@ -34,7 +35,7 @@ from ropemother.transport.client import TransportClient
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:06:35+00:00"
+__date__ = "2026-07-09T17:53:48+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -117,7 +118,6 @@ class LocalMessageBusHost(MessageBusHost):
     _socket_path: Path | None
     _configured_runtime_path: Path | None
     _configured_socket_path: Path | None
-    _format_table: PortableFormatTable
     _bus: DirectMessageBus | None
     _service: MessageBusService | None
     _service_thread: Thread | None
@@ -133,7 +133,7 @@ class LocalMessageBusHost(MessageBusHost):
     def __init__(
         self,
         *,
-        format_table: PortableFormatTable | None = None,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
         broker_extensions: list[BrokerExtension] | None = None,
@@ -148,8 +148,9 @@ class LocalMessageBusHost(MessageBusHost):
                 "socket_path, not both"
             )
 
-        if format_table is None:
-            format_table = default_portable_format_table()
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
 
         self._runtime_directory = None
         self._runtime_path = None
@@ -158,7 +159,7 @@ class LocalMessageBusHost(MessageBusHost):
             runtime_directory
         )
         self._configured_socket_path = self._normalize_path(socket_path)
-        self._format_table = format_table
+        self._format_registry = format_registry
         self._bus = None
         self._service = None
         self._service_thread = None
@@ -184,15 +185,15 @@ class LocalMessageBusHost(MessageBusHost):
 
         socket_path = self._prepare_socket_path()
         bus = DirectMessageBus(
-            capture_mode=self._capture_mode, capture_sink=self._capture_sink
+            capture_mode=self._capture_mode,
+            capture_sink=self._capture_sink,
+            extra_formats=self._format_registry.formats(),
         )
 
         listener = LocalBusServiceListener.from_socket_path(
             socket_path, replace_existing=self._replace_existing_socket
         )
-        service = MessageBusService.from_listener(
-            bus=bus, listener=listener, format_table=self._format_table
-        )
+        service = MessageBusService.from_listener(bus=bus, listener=listener)
         service_thread = Thread(
             target=service.serve_forever, daemon=self._daemon_service
         )
@@ -249,7 +250,7 @@ class LocalMessageBusHost(MessageBusHost):
         descriptor = self.connection_descriptor()
         client = connect_transport_client(
             descriptor=descriptor,
-            format_table=self._format_table,
+            extra_formats=self._format_registry.formats(),
         )
         self._clients.append((name, client))
         return client

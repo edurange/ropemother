@@ -28,7 +28,7 @@ from ropemother.exceptions import (
     MessageBusBaseException,
     PayloadSerializationError,
 )
-from ropemother.format.formattable import PortableFormatTable
+from ropemother.format.defaults import default_portable_format_registry
 from ropemother.format.portableformat import (
     PortableFormat,
     PortableFormatKey,
@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T04:54:03+00:00"
+__date__ = "2026-07-09T17:23:01+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -160,6 +160,7 @@ class DirectBrokerCore:
     def __init__(
         self,
         *,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         capture_enabled: bool = True,
         bootstrap_enabled: bool = False,
         bootstrap_policy: BootstrapPolicy | None = None,
@@ -174,7 +175,9 @@ class DirectBrokerCore:
             bootstrap_enabled=bootstrap_enabled,
             bootstrap_limits=bootstrap_limits,
         )
-        self._format_registry = PortableFormatRegistry()
+        self._format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
         self._symbol_registry = MessageSymbolRegistry()
         self._registrations = []
         self._bus_sequence = 0
@@ -360,7 +363,7 @@ class DirectBrokerCore:
     def capture_source(self) -> CaptureRecordSource | None:
         return self._capture_controller.capture_source()
 
-    def format_table(self) -> PortableFormatTable:
+    def format_registry(self) -> PortableFormatRegistry:
         return self._format_registry
 
     # Is it possible to preserve more type information than Any here?

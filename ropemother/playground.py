@@ -62,17 +62,17 @@ from ropemother.exceptions import (
     MissingMessageTypeError,
     PayloadSerializationError,
 )
-from ropemother.format.formattable import (
-    PortableFormatTable,
-    StaticPortableFormatTable,
-)
+from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
+    COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
-    RAW_BYTES_PORTABLE_FORMAT
+    RAW_BYTES_PORTABLE_FORMAT,
 )
 from ropemother.format.registry import (
     PortableFormatID,
     PortableFormatRegistration,
+    PortableFormatRegistry,
 )
 from ropemother.fixtures.scriptedinput import (
     ScriptedInputEmitter,
@@ -101,10 +101,6 @@ from ropemother.service.brokerhistory import (
     preconfigured_history_client,
 )
 from ropemother.service.connector import connect_transport_client
-from ropemother.service.defaults import (
-    COMPOSITE_PORTABLE_FORMAT,
-    default_portable_format_table,
-)
 from ropemother.service.environment import (
     connect_async_message_bus,
     connect_client_from_bus_contact,
@@ -150,7 +146,7 @@ from ropemother.util.onelinejson import oneline_deserialize, oneline_serialize
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T02:07:38+00:00"
+__date__ = "2026-07-09T18:04:34+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -939,11 +935,9 @@ def demo_broker_transport_session_registers_emitter() -> None:
     endpoint_connection, broker_connection = MemoryFrameConnection.make_pair()
     endpoint_channel = FrameChannel(endpoint_connection)
     broker_channel = FrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = BrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(),
-        format_table=format_table,
     )
     request_frame = RegisterEmitterFrame(
         msg_topic=DEMO_TOPIC,
@@ -978,11 +972,9 @@ def demo_broker_transport_session_subscribes() -> None:
     endpoint_connection, broker_connection = MemoryFrameConnection.make_pair()
     endpoint_channel = FrameChannel(endpoint_connection)
     broker_channel = FrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = BrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(),
-        format_table=format_table,
     )
     request_frame = SubscribeFrame(
         msg_topic=(topic_tree(DEMO_TOPIC),),
@@ -1037,10 +1029,8 @@ def _make_transport_session() -> tuple[FrameChannel, BrokerTransportSession]:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
-    session = bus.create_transport_session(
-        channel=broker_channel, format_table=format_table
-    )
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+    session = bus.create_transport_session(channel=broker_channel)
     return endpoint_channel, session
 
 
@@ -1123,18 +1113,16 @@ def _service_transport_session(
 def _make_transport_endpoint(
     *,
     bus: DirectMessageBus,
-    format_table: PortableFormatTable,
+    format_registry: PortableFormatTable,
     connections: tuple[FrameConnection, FrameConnection],
 ) -> tuple[TransportClient, BrokerTransportSession]:
     endpoint_connection, broker_connection = connections
     endpoint_channel = FrameChannel(endpoint_connection)
     broker_channel = FrameChannel(broker_connection)
     client = TransportClient(
-        channel=endpoint_channel, format_table=format_table
+        channel=endpoint_channel, extra_formats=format_registry.formats()
     )
-    session = bus.create_transport_session(
-        channel=broker_channel, format_table=format_table
-    )
+    session = bus.create_transport_session(channel=broker_channel)
     return client, session
 
 
@@ -1144,15 +1132,15 @@ def demo_transport_client_receives_from_another_endpoint() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     worker = _service_transport_session(producer_session, 1)
@@ -1209,15 +1197,15 @@ def demo_socket_transport_client_receives_from_another_endpoint() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=SocketFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=SocketFrameConnection.make_pair(),
     )
 
@@ -1279,17 +1267,17 @@ def demo_socket_transport_client_uses_session_runners() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_connections = SocketFrameConnection.make_pair()
     subscriber_connections = SocketFrameConnection.make_pair()
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=producer_connections,
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=subscriber_connections,
     )
 
@@ -1370,7 +1358,7 @@ def demo_zmq_transport_client_uses_session_runners() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_connections = ZMQFrameConnection.make_pair(
         second_receive_timeout_ms=25
     )
@@ -1378,10 +1366,14 @@ def demo_zmq_transport_client_uses_session_runners() -> None:
         second_receive_timeout_ms=25
     )
     producer_client, producer_session = _make_transport_endpoint(
-        bus=bus, format_table=format_table, connections=producer_connections
+        bus=bus,
+        format_registry=format_registry,
+        connections=producer_connections,
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
-        bus=bus, format_table=format_table, connections=subscriber_connections
+        bus=bus,
+        format_registry=format_registry,
+        connections=subscriber_connections,
     )
     producer_endpoint_connection, producer_broker_connection = (
         producer_connections
@@ -1457,7 +1449,7 @@ def demo_zmq_transport_preserves_message_identity() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_connections = ZMQFrameConnection.make_pair(
         second_receive_timeout_ms=25
     )
@@ -1467,12 +1459,12 @@ def demo_zmq_transport_preserves_message_identity() -> None:
 
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=producer_connections,
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=subscriber_connections,
     )
     producer_endpoint_connection, producer_broker_connection = (
@@ -1890,15 +1882,15 @@ def demo_transport_request_reply_facade() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(JSON_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(JSON_PORTABLE_FORMAT)
     requester_client, requester_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     responder_client, responder_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     requester_name = "requester-foo"
@@ -3142,17 +3134,17 @@ def demo_transport_procedure_facade() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(
+    format_registry = PortableFormatRegistry(
         JSON_PORTABLE_FORMAT, PROCEDURE_INVOCATION_JSON_FORMAT
     )
     requester_client, requester_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     responder_client, responder_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     requester_name = "requester-foo"
@@ -3213,19 +3205,19 @@ def demo_socket_transport_procedure_facade() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(
+    format_registry = PortableFormatRegistry(
         JSON_PORTABLE_FORMAT, PROCEDURE_INVOCATION_JSON_FORMAT
     )
     requester_connections = SocketFrameConnection.make_pair()
     responder_connections = SocketFrameConnection.make_pair()
     requester_client, requester_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=requester_connections,
     )
     responder_client, responder_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=responder_connections,
     )
     requester_endpoint_connection, requester_broker_connection = (
@@ -3301,15 +3293,15 @@ def demo_transport_failed_serialization_delivers_nothing() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     worker = _service_transport_session(subscriber_session, 1)
@@ -3443,15 +3435,15 @@ def demo_transport_only_mode_delivers_without_capture() -> None:
 def demo_transport_only_client_routes_without_capture() -> None:
     print("Demo: transport-only bus routes transport client messages")
     bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     worker = _service_transport_session(producer_session, 1)
@@ -3570,11 +3562,9 @@ async def demo_async_broker_transport_session_registers_emitter() -> None:
     )
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = AsyncBrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(),
-        format_table=format_table,
     )
     request_frame = RegisterEmitterFrame(
         msg_topic=DEMO_TOPIC,
@@ -3612,11 +3602,9 @@ async def demo_async_broker_transport_session_subscribes() -> None:
     )
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = AsyncBrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(),
-        format_table=format_table,
     )
     request_frame = SubscribeFrame(
         msg_topic=(topic_tree(DEMO_TOPIC),),
@@ -3668,11 +3656,9 @@ async def demo_async_broker_transport_session_emits_payload() -> None:
     )
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = AsyncBrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(capture_enabled=False),
-        format_table=format_table,
     )
     register_frame = RegisterEmitterFrame(
         msg_topic=DEMO_TOPIC,
@@ -3738,14 +3724,13 @@ async def demo_async_transport_client_receives_payload() -> None:
     )
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     client = AsyncTransportClient(
-        channel=endpoint_channel, format_table=format_table
+        channel=endpoint_channel, extra_formats=format_registry.formats()
     )
     session = AsyncBrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(capture_enabled=False),
-        format_table=format_table,
     )
 
     registration_task = asyncio.create_task(
@@ -3809,33 +3794,31 @@ async def demo_async_transport_client_receives_payload() -> None:
 def _make_async_transport_endpoint(
     *,
     bus: AsyncDirectMessageBus,
-    format_table: PortableFormatTable,
+    format_registry: PortableFormatTable,
     connections: tuple[AsyncFrameConnection, AsyncFrameConnection],
 ) -> tuple[AsyncTransportClient, AsyncBrokerTransportSession]:
     endpoint_connection, broker_connection = connections
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
     client = AsyncTransportClient(
-        channel=endpoint_channel, format_table=format_table
+        channel=endpoint_channel, extra_formats=format_registry.formats()
     )
-    session = bus.create_transport_session(
-        channel=broker_channel, format_table=format_table
-    )
+    session = bus.create_transport_session(channel=broker_channel)
     return client, session
 
 
 async def demo_async_transport_client_receives_from_another_endpoint() -> None:
     print("Demo: async transport client receives from another endpoint")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
 
@@ -3899,15 +3882,15 @@ async def demo_async_transport_client_receives_from_another_endpoint() -> None:
 async def demo_async_transport_request_client_service_facade() -> None:
     print("Demo: async transport request client/service facade")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(JSON_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(JSON_PORTABLE_FORMAT)
     requester_client, requester_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     responder_client, responder_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     requester_name = "requester-foo"
@@ -3982,17 +3965,17 @@ async def demo_async_transport_request_client_service_facade() -> None:
 async def demo_async_transport_procedure_facade() -> None:
     print("Demo: async transport procedure facade")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(
+    format_registry = PortableFormatRegistry(
         JSON_PORTABLE_FORMAT, PROCEDURE_INVOCATION_JSON_FORMAT
     )
     requester_client, requester_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     responder_client, responder_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     requester_name = "requester-foo"
@@ -4119,22 +4102,18 @@ def demo_message_bus_service_routes_between_clients() -> None:
         socket_path = Path(runtime_dir) / "ropemother-service-demo.sock"
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
-        service = MessageBusService.from_listener(
-            bus=bus,
-            listener=listener,
-            format_table=format_table,
-        )
+        format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+        service = MessageBusService.from_listener(bus=bus, listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         producer_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         emitter = producer_client.register_emitter(
             msg_topic=DEMO_TOPIC,
@@ -4363,11 +4342,9 @@ async def demo_async_broker_transport_session_emit_acknowledgement() -> None:
     )
     endpoint_channel = AsyncFrameChannel(endpoint_connection)
     broker_channel = AsyncFrameChannel(broker_connection)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
     session = AsyncBrokerTransportSession(
         channel=broker_channel,
         core=DirectBrokerCore(capture_enabled=False),
-        format_table=format_table,
     )
 
     register_frame = RegisterEmitterFrame(
@@ -4430,10 +4407,10 @@ async def demo_async_broker_transport_session_emit_acknowledgement() -> None:
 def demo_transport_emit_reports_rejection() -> None:
     print("Demo: transport verified emit reports rejection")
     bus = DirectMessageBus.capture_bootstrap()
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     client, session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     worker = _service_transport_session(session, 1)
@@ -4473,10 +4450,10 @@ def demo_transport_emit_reports_rejection() -> None:
 async def demo_async_transport_emit_reports_rejection() -> None:
     print("Demo: async transport verified emit reports rejection")
     bus = AsyncDirectMessageBus.capture_bootstrap()
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     client, session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     registration_task = asyncio.create_task(
@@ -4520,27 +4497,24 @@ def demo_message_bus_service_capture_bootstrap() -> None:
     with TemporaryDirectory() as runtime_dir:
         socket_path = Path(runtime_dir) / "ropemother-bootstrap-demo.sock"
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(
+        format_registry = PortableFormatRegistry(
             JSON_PORTABLE_FORMAT, RAW_BYTES_PORTABLE_FORMAT
         )
-        service = MessageBusService.capture_bootstrap(
-            listener=listener,
-            format_table=format_table,
-        )
+        service = MessageBusService.capture_bootstrap(listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         lifecycle_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         producer_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         lifecycle = lifecycle_client.create_lifecycle_publisher(
             msg_producer=DEMO_PRODUCER
@@ -4614,12 +4588,8 @@ def demo_message_bus_service_contact_variable() -> None:
         socket_path = Path(runtime_dir) / "ropemother-env-demo.sock"
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
-        service = MessageBusService.from_listener(
-            bus=bus,
-            listener=listener,
-            format_table=format_table,
-        )
+        format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+        service = MessageBusService.from_listener(bus=bus, listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         variables = {}
@@ -4627,11 +4597,11 @@ def demo_message_bus_service_contact_variable() -> None:
         set_bus_contact_uri(descriptor, variables=variables)
         producer_client = connect_client_from_bus_contact(
             variables=variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_client_from_bus_contact(
             variables=variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         emitter = producer_client.register_emitter(
             msg_topic=DEMO_TOPIC,
@@ -4675,12 +4645,8 @@ def demo_message_bus_service_contact_handoff() -> None:
         socket_path = Path(runtime_dir) / "ropemother-env-vars-demo.sock"
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
-        service = MessageBusService.from_listener(
-            bus=bus,
-            listener=listener,
-            format_table=format_table,
-        )
+        format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+        service = MessageBusService.from_listener(bus=bus, listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         source_variables = {"FOO": "bar"}
@@ -4690,11 +4656,11 @@ def demo_message_bus_service_contact_handoff() -> None:
         )
         producer_client = connect_client_from_bus_contact(
             variables=contact_variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_client_from_bus_contact(
             variables=contact_variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         emitter = producer_client.register_emitter(
             msg_topic=DEMO_TOPIC,
@@ -4743,12 +4709,8 @@ def demo_message_bus_service_contact_helper() -> None:
         )
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
-        service = MessageBusService.from_listener(
-            bus=bus,
-            listener=listener,
-            format_table=format_table,
-        )
+        format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+        service = MessageBusService.from_listener(bus=bus, listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         source_variables = {"FOO": "bar"}
@@ -4757,11 +4719,11 @@ def demo_message_bus_service_contact_helper() -> None:
         )
         producer_client = connect_client_from_bus_contact(
             variables=contact_variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_client_from_bus_contact(
             variables=contact_variables,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         emitter = producer_client.register_emitter(
             msg_topic=DEMO_TOPIC,
@@ -4817,27 +4779,24 @@ def demo_message_bus_service_file_capture_bootstrap() -> None:
         socket_path = runtime_path / "ropemother-file-bootstrap-demo.sock"
         capture_path = runtime_path / "capture.jsonl"
         listener = LocalBusServiceListener.from_socket_path(socket_path)
-        format_table = StaticPortableFormatTable(
+        format_registry = PortableFormatRegistry(
             JSON_PORTABLE_FORMAT, RAW_BYTES_PORTABLE_FORMAT
         )
-        service = MessageBusService.capture_bootstrap(
-            listener=listener,
-            format_table=format_table,
-        )
+        service = MessageBusService.capture_bootstrap(listener=listener)
         service_thread = Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         lifecycle_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         producer_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         subscriber_client = connect_transport_client(
             descriptor=descriptor,
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         lifecycle = lifecycle_client.create_lifecycle_publisher(
             msg_producer=DEMO_PRODUCER
@@ -5056,15 +5015,15 @@ def demo_transport_client_topic_selector_collection() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     canonical_topics = [
@@ -5190,15 +5149,15 @@ def demo_transport_client_producer_selector_collection() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     canonical_producers = [DEMO_PRODUCER, DEMO_PRODUCER + "-quux"]
@@ -5380,15 +5339,15 @@ def demo_transport_client_additional_message_type() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     canonical_msg_type = DEMO_ALT_MSG_TYPE
@@ -5447,15 +5406,15 @@ def demo_transport_client_unlisted_message_type_allowed() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     canonical_msg_type = DEMO_ALT_MSG_TYPE
@@ -5513,15 +5472,15 @@ def demo_transport_client_unlisted_message_type_allowed() -> None:
 async def demo_async_transport_client_additional_message_type() -> None:
     print("Demo: async transport client emits declared additional types")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     canonical_msg_type = DEMO_ALT_MSG_TYPE
@@ -5584,15 +5543,15 @@ async def demo_async_transport_client_additional_message_type() -> None:
 async def demo_async_transport_client_unlisted_message_type_allowed() -> None:
     print("Demo: async transport client may allow unlisted message type")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     subscriber_client, subscriber_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     canonical_msg_type = DEMO_ALT_MSG_TYPE
@@ -5659,10 +5618,10 @@ def demo_transport_client_unlisted_message_type_rejected() -> None:
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=MemoryFrameConnection.make_pair(),
     )
     canonical_rejected = True
@@ -5699,10 +5658,10 @@ def demo_transport_client_unlisted_message_type_rejected() -> None:
 async def demo_async_transport_client_unlisted_message_type_rejected() -> None:
     print("Demo: async transport client rejects unlisted type by default")
     bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
-    format_table = StaticPortableFormatTable(RAW_BYTES_PORTABLE_FORMAT)
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
     producer_client, producer_session = _make_async_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=AsyncMemoryFrameConnection.make_pair(),
     )
     canonical_rejected = True
@@ -5812,17 +5771,17 @@ def demo_transport_client_supported_type_formats() -> None:
         DEMO_MSG_TYPE: canonical_formats,
         DEMO_ALT_MSG_TYPE: canonical_json_format,
     }
-    format_table = StaticPortableFormatTable(*canonical_formats)
+    format_registry = PortableFormatRegistry(*canonical_formats)
     producer_connections = MemoryFrameConnection.make_pair()
     subscriber_connections = MemoryFrameConnection.make_pair()
     producer_client, producer_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=producer_connections,
     )
     subscriber_client, subscriber_session = _make_transport_endpoint(
         bus=bus,
-        format_table=format_table,
+        format_registry=format_registry,
         connections=subscriber_connections,
     )
 
@@ -6890,16 +6849,16 @@ async def demo_async_socket_service_history_facade() -> None:
         runtime_path = Path(runtime_dir)
         socket_path = runtime_path / "ropemother-async-history-demo.sock"
         capture_path = runtime_path / "ropemother-async-history-demo.jsonl"
-        format_table = default_portable_format_table()
+        format_registry = default_portable_format_registry()
         bus = AsyncDirectMessageBus()
         sink = JSONLinesCaptureSink(capture_path, append=False)
         bus.set_capture_sink(sink)
         listener = AsyncLocalBusServiceListener.from_socket_path(socket_path)
         service = AsyncMessageBusService.from_listener(
-            bus=bus, listener=listener, format_table=format_table
+            bus=bus, listener=listener
         )
         history = JSONLinesCaptureHistory(
-            capture_path, format_table=format_table
+            capture_path, format_registry=format_registry
         )
         history_service = bus.create_history_service(
             history=history,
@@ -6915,11 +6874,11 @@ async def demo_async_socket_service_history_facade() -> None:
         await asyncio.sleep(0)
         producer = await connect_async_message_bus(
             descriptor=service.connection_descriptor(),
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         requester = await connect_async_message_bus(
             descriptor=service.connection_descriptor(),
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
 
         history_client = await requester.create_history_client(
@@ -6970,17 +6929,17 @@ def demo_local_message_bus_host_broker_history() -> None:
     with TemporaryDirectory() as runtime_dir:
         runtime_path = Path(runtime_dir)
         capture_path = runtime_path / "capture.jsonl"
-        format_table = default_portable_format_table()
+        format_registry = default_portable_format_registry()
         sink = JSONLinesCaptureSink(capture_path, append=False)
         history = JSONLinesCaptureHistory(
-            capture_path, format_table=format_table
+            capture_path, format_registry=format_registry
         )
 
         host = LocalMessageBusHost(
             runtime_directory=runtime_path,
             capture_sink=sink,
             broker_extensions=[BrokerHistoryExtension(history)],
-            format_table=format_table,
+            extra_formats=format_registry.formats(),
         )
         host.start()
 

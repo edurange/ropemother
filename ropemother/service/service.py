@@ -12,7 +12,6 @@ from ropemother.bootstrap.policy import BootstrapPolicy
 from ropemother.broker.direct import DirectMessageBus
 from ropemother.capture.sink import CaptureSink
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import PortableFormatTable
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.service.environment import (
     BUS_CONTACT_URI_VARIABLE,
@@ -24,7 +23,7 @@ from ropemother.transport.sessionrunner import BrokerTransportSessionRunner
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T20:04:16+00:00"
+__date__ = "2026-07-09T17:06:57+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -50,7 +49,6 @@ class MessageBusService:
     """Foreground service wrapper for a message bus broker."""
     _bus: DirectMessageBus
     _listener: FrameConnectionListener
-    _format_table: PortableFormatTable
     _session_runners: list[BrokerTransportSessionRunner]
     _stop_requested: Event
     _started: bool
@@ -62,12 +60,10 @@ class MessageBusService:
         *,
         bus: DirectMessageBus,
         listener: FrameConnectionListener,
-        format_table: PortableFormatTable,
         daemon_sessions: bool = True,
     ) -> None:
         self._bus = bus
         self._listener = listener
-        self._format_table = format_table
         self._session_runners = []
         self._stop_requested = Event()
         self._started = False
@@ -80,13 +76,11 @@ class MessageBusService:
         *,
         bus: DirectMessageBus,
         listener: FrameConnectionListener,
-        format_table: PortableFormatTable,
         daemon_sessions: bool = True,
     ) -> Self:
         service = cls(
             bus=bus,
             listener=listener,
-            format_table=format_table,
             daemon_sessions=daemon_sessions,
         )
         return service
@@ -96,7 +90,6 @@ class MessageBusService:
         cls,
         *,
         listener: FrameConnectionListener,
-        format_table: PortableFormatTable,
         bootstrap_policy: BootstrapPolicy | None = None,
         bootstrap_limits: BootstrapBufferLimits | None = None,
         daemon_sessions: bool = True,
@@ -106,10 +99,7 @@ class MessageBusService:
             bootstrap_limits=bootstrap_limits,
         )
         service = cls.from_listener(
-            bus=bus,
-            listener=listener,
-            format_table=format_table,
-            daemon_sessions=daemon_sessions,
+            bus=bus, listener=listener, daemon_sessions=daemon_sessions
         )
         return service
 
@@ -178,10 +168,7 @@ class MessageBusService:
 
     def _start_session(self, connection: FrameConnection) -> None:
         channel = FrameChannel(connection)
-        session = self._bus.create_transport_session(
-            channel=channel,
-            format_table=self._format_table,
-        )
+        session = self._bus.create_transport_session(channel=channel)
         runner = BrokerTransportSessionRunner(
             session=session,
             close_connection=connection.close,

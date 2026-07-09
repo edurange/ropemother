@@ -14,15 +14,10 @@ from ropemother.capture.historyselection import (
 )
 from ropemother.capture.writer import CaptureRecord, CaptureRecordSource
 from ropemother.exceptions import MessageBusBaseException
+from ropemother.format.defaults import default_portable_format_registry
 from ropemother.format.formattable import (
     PortableFormatTable,
     PortableFormatTableError,
-    StaticPortableFormatTable,
-)
-from ropemother.format.portableformat import (
-    COMPOSITE_PORTABLE_FORMAT,
-    JSON_PORTABLE_FORMAT,
-    RAW_BYTES_PORTABLE_FORMAT,
 )
 from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, CapturedMessage
@@ -35,7 +30,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T03:02:38+00:00"
+__date__ = "2026-07-09T17:23:58+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -105,7 +100,7 @@ class MessageHistory(ABC):
 class InMemoryCaptureHistory(MessageHistory):
     """Message history view backed by in-memory capture records."""
     _source: CaptureRecordSource
-    _format_table: PortableFormatTable
+    _format_registry: PortableFormatTable
     _registrations: MessageRegistrationTable
     _indexed_record_count: int
 
@@ -113,13 +108,13 @@ class InMemoryCaptureHistory(MessageHistory):
         self,
         source: CaptureRecordSource,
         *,
-        format_table: PortableFormatTable | None = None,
+        format_registry: PortableFormatTable | None = None,
     ) -> None:
-        if format_table is None:
-            format_table = _default_history_format_table()
+        if format_registry is None:
+            format_registry = default_portable_format_registry()
 
         self._source = source
-        self._format_table = format_table
+        self._format_registry = format_registry
         self._registrations = MessageRegistrationTable()
         self._indexed_record_count = 0
 
@@ -269,7 +264,7 @@ class InMemoryCaptureHistory(MessageHistory):
             ) from e
 
         try:
-            payload_format = self._format_table.from_key(format_key)
+            payload_format = self._format_registry.from_key(format_key)
         except PortableFormatTableError as e:
             raise MessageHistoryPayloadDecodeError(
                 "history has no local decoder for payload format "
@@ -347,12 +342,3 @@ def _registrations_from(
         if not isinstance(record, CapturedMessage):
             registrations.append(record)
     return tuple(registrations)
-
-
-def _default_history_format_table() -> PortableFormatTable:
-    formats = (
-        RAW_BYTES_PORTABLE_FORMAT,
-        JSON_PORTABLE_FORMAT,
-        COMPOSITE_PORTABLE_FORMAT,
-    )
-    return StaticPortableFormatTable(*formats)

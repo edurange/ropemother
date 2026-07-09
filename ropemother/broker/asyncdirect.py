@@ -21,11 +21,11 @@ from ropemother.broker.endpoints import reply_metadata_for
 from ropemother.broker.subscription import Subscription
 from ropemother.capture.sink import CaptureSink
 from ropemother.capture.writer import CaptureRecordSource
-from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     PortableFormat,
     JSON_PORTABLE_FORMAT,
 )
+from ropemother.format.registry import PortableFormatRegistry
 from ropemother.message.messageidentity import CorrelationID
 from ropemother.message.records import (
     BusMessage,
@@ -44,7 +44,7 @@ from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T04:54:53+00:00"
+__date__ = "2026-07-09T17:06:12+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -57,6 +57,7 @@ class AsyncDirectMessageBus(AsyncMessageBus):
     def __init__(
         self,
         *,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
     ) -> None:
@@ -67,6 +68,7 @@ class AsyncDirectMessageBus(AsyncMessageBus):
             capture_enabled=capture_mode.capture_enabled,
             bootstrap_enabled=bootstrap_enabled,
             capture_sink=capture_sink,
+            extra_formats=extra_formats,
         )
 
     def register_emitter(
@@ -127,8 +129,8 @@ class AsyncDirectMessageBus(AsyncMessageBus):
     def capture_source(self) -> CaptureRecordSource | None:
         return self._core.capture_source()
 
-    def format_table(self) -> PortableFormatTable:
-        return self._core.format_table()
+    def format_registry(self) -> PortableFormatRegistry:
+        return self._core.format_registry()
 
     @classmethod
     def capture_bootstrap(
@@ -152,12 +154,9 @@ class AsyncDirectMessageBus(AsyncMessageBus):
         return bus
 
     def create_transport_session(
-        self, *, channel: AsyncFrameChannel, format_table: PortableFormatTable
+        self, *, channel: AsyncFrameChannel
     ) -> AsyncBrokerTransportSession:
-        session = AsyncBrokerTransportSession(
-            channel=channel, core=self._core, format_table=format_table
-        )
-        return session
+        return AsyncBrokerTransportSession(channel=channel, core=self._core)
 
 
 class _AsyncBrokerEmitter(AsyncEmitter):

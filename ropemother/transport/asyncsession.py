@@ -8,11 +8,8 @@ from typing import Any
 
 from ropemother.broker.directcore import BrokerDeliveryTarget, DirectBrokerCore
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import (
-    PortableFormat,
-    PortableFormatTable,
-    UnknownPortableFormatError,
-)
+from ropemother.format.formattable import UnknownPortableFormatError
+from ropemother.format.portableformat import PortableFormat
 from ropemother.message.records import BusMessage, SerializedPayload
 from ropemother.message.selectors import SubscriptionTopicFilter
 from ropemother.transport.asyncconnection import AsyncFrameChannel
@@ -36,7 +33,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T17:16:40+00:00"
+__date__ = "2026-07-09T16:36:48+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -46,20 +43,14 @@ class AsyncBrokerTransportSession:
     """Async broker-side protocol session for one transport connection."""
     _channel: AsyncFrameChannel
     _core: DirectBrokerCore
-    _format_table: PortableFormatTable
     _state: TransportSessionState
     _delivery_tasks: list[Task[None]]
 
     def __init__(
-        self,
-        *,
-        channel: AsyncFrameChannel,
-        core: DirectBrokerCore,
-        format_table: PortableFormatTable,
+        self, *, channel: AsyncFrameChannel, core: DirectBrokerCore
     ) -> None:
         self._channel = channel
         self._core = core
-        self._format_table = format_table
         self._state = TransportSessionState()
         self._delivery_tasks = []
 
@@ -87,7 +78,8 @@ class AsyncBrokerTransportSession:
         self, frame: RegisterEmitterFrame
     ) -> None:
         try:
-            payload_format = self._format_table.from_key(frame.format_key)
+            format_registry = self._core.format_registry()
+            payload_format = format_registry.from_key(frame.format_key)
             supported_type_formats = (
                 self._supported_type_formats_from_frame(frame)
             )
@@ -146,7 +138,8 @@ class AsyncBrokerTransportSession:
         self, frame: RegisterPayloadFormatFrame
     ) -> None:
         try:
-            payload_format = self._format_table.from_key(frame.format_key)
+            format_registry = self._core.format_registry()
+            payload_format = format_registry.from_key(frame.format_key)
         except UnknownPortableFormatError:
             registration_key = frame.format_key.registration_key
             error_message = f"unsupported portable format: {registration_key}"
@@ -276,7 +269,7 @@ class AsyncBrokerTransportSession:
         supported_type_formats = {}
         for support in frame.supported_type_formats:
             formats = tuple(
-                self._format_table.from_key(format_key)
+                self._core.format_registry().from_key(format_key)
                 for format_key in support.format_keys
             )
             supported_type_formats[support.msg_type] = formats

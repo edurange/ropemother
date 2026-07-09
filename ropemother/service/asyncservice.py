@@ -12,7 +12,6 @@ from ropemother.bootstrap.policy import BootstrapPolicy
 from ropemother.broker.asyncdirect import AsyncDirectMessageBus
 from ropemother.capture.sink import CaptureSink
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import PortableFormatTable
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.service.environment import (
     BUS_CONTACT_URI_VARIABLE,
@@ -29,7 +28,7 @@ from ropemother.transport.asyncsessionrunner import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-04T23:10:07+00:00"
+__date__ = "2026-07-09T17:07:37+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -61,7 +60,6 @@ class AsyncMessageBusService:
     """Foreground async service wrapper for a message bus broker."""
     _bus: AsyncDirectMessageBus
     _listener: AsyncFrameConnectionListener
-    _format_table: PortableFormatTable
     _session_runners: list[AsyncBrokerTransportSessionRunner]
     _stop_requested: Event
     _started: bool
@@ -72,11 +70,9 @@ class AsyncMessageBusService:
         *,
         bus: AsyncDirectMessageBus,
         listener: AsyncFrameConnectionListener,
-        format_table: PortableFormatTable,
     ) -> None:
         self._bus = bus
         self._listener = listener
-        self._format_table = format_table
         self._session_runners = []
         self._stop_requested = Event()
         self._started = False
@@ -88,16 +84,14 @@ class AsyncMessageBusService:
         *,
         bus: AsyncDirectMessageBus,
         listener: AsyncFrameConnectionListener,
-        format_table: PortableFormatTable,
     ) -> Self:
-        return cls(bus=bus, listener=listener, format_table=format_table)
+        return cls(bus=bus, listener=listener)
 
     @classmethod
     def capture_bootstrap(
         cls,
         *,
         listener: AsyncFrameConnectionListener,
-        format_table: PortableFormatTable,
         bootstrap_policy: BootstrapPolicy | None = None,
         bootstrap_limits: BootstrapBufferLimits | None = None,
     ) -> Self:
@@ -105,10 +99,7 @@ class AsyncMessageBusService:
             bootstrap_policy=bootstrap_policy,
             bootstrap_limits=bootstrap_limits,
         )
-        service = cls.from_listener(
-            bus=bus, listener=listener, format_table=format_table
-        )
-        return service
+        return cls.from_listener(bus=bus, listener=listener)
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._bus.set_capture_sink(capture_sink)
@@ -177,9 +168,7 @@ class AsyncMessageBusService:
 
     def _start_session(self, connection: AsyncFrameConnection) -> None:
         channel = AsyncFrameChannel(connection)
-        session = self._bus.create_transport_session(
-            channel=channel, format_table=self._format_table
-        )
+        session = self._bus.create_transport_session(channel=channel)
         runner = AsyncBrokerTransportSessionRunner(
             session=session, close_connection=connection.close
         )

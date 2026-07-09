@@ -15,10 +15,8 @@ from ropemother.broker.asyncendpoints import AsyncEmitter
 from ropemother.broker.base import MessageBus
 from ropemother.broker.endpoints import Emitter
 from ropemother.exceptions import MessageBusBaseException
-from ropemother.format.formattable import (
-    PortableFormatTable,
-    StaticPortableFormatTable,
-)
+from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
@@ -35,7 +33,7 @@ from ropemother.util.onelinejson import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T07:42:30+00:00"
+__date__ = "2026-07-09T17:26:24+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -80,21 +78,21 @@ class ScriptedInputPlan:
         cls,
         path: str | Path,
         *,
-        format_table: PortableFormatTable | None = None,
+        format_registry: PortableFormatTable | None = None,
     ) -> "ScriptedInputPlan":
         source_path = Path(path)
         text = source_path.read_text(encoding="utf-8")
-        return cls.from_jsonl_text(text, format_table=format_table)
+        return cls.from_jsonl_text(text, format_registry=format_registry)
 
     @classmethod
     def from_jsonl_text(
         cls,
         text: str,
         *,
-        format_table: PortableFormatTable | None = None,
+        format_registry: PortableFormatTable | None = None,
     ) -> "ScriptedInputPlan":
-        if format_table is None:
-            format_table = default_scripted_input_format_table()
+        if format_registry is None:
+            format_registry = default_portable_format_registry()
 
         events: list[ScriptedInputEvent] = []
         for line_number, line in enumerate(text.splitlines(), start=1):
@@ -103,7 +101,9 @@ class ScriptedInputPlan:
                 continue
             record = _record_from_line(stripped_line, line_number)
             event = _event_from_record(
-                record, line_number=line_number, format_table=format_table
+                record,
+                line_number=line_number,
+                format_registry=format_registry,
             )
             events.append(event)
         return cls(events=tuple(events))
@@ -113,15 +113,15 @@ class ScriptedInputPlan:
         cls,
         records: Iterable[JSONRecord],
         *,
-        format_table: PortableFormatTable | None = None,
+        format_registry: PortableFormatTable | None = None,
     ) -> "ScriptedInputPlan":
-        if format_table is None:
-            format_table = default_scripted_input_format_table()
+        if format_registry is None:
+            format_registry = default_portable_format_registry()
 
         events: list[ScriptedInputEvent] = []
         for index, record in enumerate(records):
             event = _event_from_record(
-                record, line_number=index + 1, format_table=format_table
+                record, line_number=index + 1, format_registry=format_registry
             )
             events.append(event)
         return cls(events=tuple(events))
@@ -269,10 +269,10 @@ def _event_from_record(
     record: JSONRecord,
     *,
     line_number: int,
-    format_table: PortableFormatTable,
+    format_registry: PortableFormatTable,
 ) -> ScriptedInputEvent:
     format_key = _format_key_from_record(record)
-    payload_format = format_table.from_key(format_key)
+    payload_format = format_registry.from_key(format_key)
     event = ScriptedInputEvent(
         at=_optional_float(record, "at", line_number=line_number),
         msg_topic=_required_str(record, "msg_topic", line_number),
@@ -426,12 +426,3 @@ def _optional_float(
             f"{line_number} field {key!r} must not be negative"
         )
     return result
-
-
-def default_scripted_input_format_table() -> PortableFormatTable:
-    formats = (
-        RAW_BYTES_PORTABLE_FORMAT,
-        JSON_PORTABLE_FORMAT,
-        COMPOSITE_PORTABLE_FORMAT,
-    )
-    return StaticPortableFormatTable(*formats)
