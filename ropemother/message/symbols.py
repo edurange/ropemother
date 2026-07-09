@@ -60,7 +60,7 @@ class MessageSymbolKind(Enum):
     PRODUCER = 3
 
 
-# Can these be reconciled with utility symbol types from aostore?
+# Can these be reconciled with utility symbol types from intarsia?
 class TopicID(TypedID):
     """Compact identifier for a registered message topic."""
     pass

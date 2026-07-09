@@ -1,6 +1,6 @@
 # ropemother
 
-This is a preview of `ropemother`, a Python package for building small message-oriented systems. It provides a low-configuration direct broker, readable topic/type/producer names, capture support, portable payload formats, and request/reply helpers for simple local services.
+This is a developer release of `ropemother`, a Python package for building small message-oriented systems. It provides a low-configuration direct broker, readable topic/type/producer names, capture support, portable payload formats, and request/reply helpers for simple local services.
 
 The direct broker is useful for local development, teaching, demos, and early integration work. It is not intended to be the final transport story for every deployment. The package is organized so code can begin against project-owned message concepts while leaving room for later transport adapters and stronger persistence infrastructure.
 
@@ -29,10 +29,10 @@ Use the same path setup for small scripts:
 PYTHONPATH="$PWD/ropemother:$PWD" python my_example.py
 ```
 
-If an example also imports a companion source tree such as `aostore`, add that source tree to `PYTHONPATH` as well:
+If an example also imports a companion source tree such as `intarsia`, add that source tree to `PYTHONPATH` as well:
 
 ```sh
-PYTHONPATH="$PWD/ropemother:$PWD/aostore:$PWD" python my_example.py
+PYTHONPATH="$PWD/ropemother:$PWD/intarsia:$PWD" python my_example.py
 ```
 
 The freestanding broker uses the same source-path setup. Its startup and client commands are shown later in this README.
