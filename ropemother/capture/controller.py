@@ -9,7 +9,11 @@ from typing import Iterable
 
 from ropemother.bootstrap.buffer import BootstrapBuffer, BootstrapBufferLimits
 from ropemother.capture.sink import CaptureSink
-from ropemother.capture.writer import CaptureRecordWriter, RegistrationRecord
+from ropemother.capture.writer import (
+    CaptureRecordSource,
+    CaptureRecordWriter,
+    RegistrationRecord,
+)
 from ropemother.exceptions import (
     CaptureDisabledError,
     CaptureUnavailableError,
@@ -21,7 +25,7 @@ from ropemother.message.symbols import MessageSymbolRegistration
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T15:38:32+00:00"
+__date__ = "2026-07-09T02:55:12+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -102,6 +106,11 @@ class CaptureController(CaptureRecordWriter):
         if self._buffer is None:
             return 0
         return self._buffer.pending_payload_bytes
+
+    def capture_source(self) -> CaptureRecordSource | None:
+        if isinstance(self._capture_sink, CaptureRecordSource):
+            return self._capture_sink
+        return None
 
     def activate_capture_sink(
         self,

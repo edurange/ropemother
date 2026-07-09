@@ -35,7 +35,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T18:47:59+00:00"
+__date__ = "2026-07-09T03:02:38+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -264,16 +264,21 @@ class InMemoryCaptureHistory(MessageHistory):
             )
         except UnknownMessageRegistrationError as e:
             raise IncompleteMessageHistoryError(
-                "history is missing a payload format registration needed "
-                "to decode a message"
+                "history is missing a payload format registration needed to "
+                "decode a message"
             ) from e
 
         try:
             payload_format = self._format_table.from_key(format_key)
-            payload = payload_format.decode(
-                serialized_payload.payload_bytes
-            )
-        except (PortableFormatTableError, TypeError, ValueError) as e:
+        except PortableFormatTableError as e:
+            raise MessageHistoryPayloadDecodeError(
+                "history has no local decoder for payload format "
+                f"{format_key.registration_key!r}"
+            ) from e
+
+        try:
+            payload = payload_format.decode(serialized_payload.payload_bytes)
+        except (TypeError, ValueError) as e:
             raise MessageHistoryPayloadDecodeError(
                 "history payload could not be decoded with format "
                 f"{format_key.registration_key!r}"
@@ -288,13 +293,11 @@ def _validate_selection(selection: HistorySelection) -> None:
         )
     if selection.start_sequence is not None and selection.start_sequence < 0:
         raise InvalidHistorySelectionError(
-            "start_sequence must be non-negative: "
-            f"{selection.start_sequence}"
+            f"start_sequence must be non-negative: {selection.start_sequence}"
         )
     if selection.stop_sequence is not None and selection.stop_sequence < 0:
         raise InvalidHistorySelectionError(
-            "stop_sequence must be non-negative: "
-            f"{selection.stop_sequence}"
+            f"stop_sequence must be non-negative: {selection.stop_sequence}"
         )
 
 

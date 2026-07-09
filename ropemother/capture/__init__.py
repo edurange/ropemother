@@ -35,6 +35,7 @@ _EXPORTS = {
     "MessageHistoryServiceError": "ropemother.capture.historyservice",
     "MessageHistorySourceError": "ropemother.capture.filehistory",
     "UnsupportedHistoryPayloadError": "ropemother.capture.historyservice",
+    "history_for": "ropemother.capture.runtime",
 }
 
 __all__ = list(_EXPORTS)

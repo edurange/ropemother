@@ -22,11 +22,12 @@ from ropemother.broker.endpoints import (
 from ropemother.broker.subscription import Subscription
 from ropemother.capture.controller import CaptureController, CaptureState
 from ropemother.capture.sink import CaptureSink
-from ropemother.capture.writer import RegistrationRecord
+from ropemother.capture.writer import CaptureRecordSource, RegistrationRecord
 from ropemother.exceptions import (
     MessageBusBaseException,
     PayloadSerializationError,
 )
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     PortableFormat,
     PortableFormatKey,
@@ -68,7 +69,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T01:08:40+00:00"
+__date__ = "2026-07-09T02:56:26+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -344,6 +345,12 @@ class DirectBrokerCore:
         self._capture_controller.activate_capture_sink(
             capture_sink, registrations=self._registrations
         )
+
+    def capture_source(self) -> CaptureRecordSource | None:
+        return self._capture_controller.capture_source()
+
+    def format_table(self) -> PortableFormatTable:
+        return self._format_registry
 
     # Is it possible to preserve more type information than Any here?
     def emit_from(

@@ -8,10 +8,15 @@ from typing import Any
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat, PortableFormatKey
+from ropemother.format.formattable import (
+    ConflictingPortableFormatError,
+    PortableFormatTable,
+    UnknownPortableFormatError,
+)
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T15:43:08+00:00"
+__date__ = "2026-07-09T02:53:34+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -64,7 +69,7 @@ class PortableFormatRegistration:
     key: PortableFormatKey
 
 
-class PortableFormatRegistry:
+class PortableFormatRegistry(PortableFormatTable):
     """Registry that assigns compact IDs to portable payload formats."""
     _format_ids: dict[PortableFormatKey, PortableFormatID]
     _formats: dict[PortableFormatID, PortableFormat[Any, Any]]
@@ -81,6 +86,7 @@ class PortableFormatRegistry:
         format_key = portable_format.key
         if format_key in self._format_ids:
             format_id = self._format_ids[format_key]
+            self._ensure_compatible_format(format_id, portable_format)
             registration = None
         else:
             format_id = PortableFormatID(len(self._format_ids))
@@ -99,3 +105,26 @@ class PortableFormatRegistry:
         self, format_id: PortableFormatID
     ) -> PortableFormat[Any, Any]:
         return self._formats[format_id]
+
+    def from_key(
+        self, key: PortableFormatKey
+    ) -> PortableFormat[Any, Any]:
+        try:
+            format_id = self._format_ids[key]
+        except KeyError as e:
+            raise UnknownPortableFormatError(
+                f"unknown portable format: {key.registration_key}"
+            ) from e
+        return self.format_for_id(format_id)
+
+    def _ensure_compatible_format(
+        self,
+        format_id: PortableFormatID,
+        portable_format: PortableFormat[Any, Any],
+    ) -> None:
+        existing_format = self._formats[format_id]
+        if existing_format != portable_format:
+            raise ConflictingPortableFormatError(
+                "conflicting portable format for key: "
+                + portable_format.key.registration_key
+            )

@@ -19,6 +19,7 @@ from ropemother.broker.directcore import (
 from ropemother.broker.endpoints import reply_metadata_for
 from ropemother.broker.subscription import Subscription
 from ropemother.capture.sink import CaptureSink
+from ropemother.capture.writer import CaptureRecordSource
 from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     PortableFormat,
@@ -42,7 +43,7 @@ from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:38:33+00:00"
+__date__ = "2026-07-09T02:58:55+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -111,6 +112,12 @@ class AsyncDirectMessageBus(AsyncMessageBus):
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._core.set_capture_sink(capture_sink)
+
+    def capture_source(self) -> CaptureRecordSource | None:
+        return self._core.capture_source()
+
+    def format_table(self) -> PortableFormatTable:
+        return self._core.format_table()
 
     @classmethod
     def capture_bootstrap(

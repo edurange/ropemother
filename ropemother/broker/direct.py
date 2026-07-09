@@ -18,6 +18,7 @@ from ropemother.broker.directcore import (
 from ropemother.broker.endpoints import Emitter, Receiver, reply_metadata_for
 from ropemother.broker.subscription import Subscription
 from ropemother.capture.sink import CaptureSink
+from ropemother.capture.writer import CaptureRecordSource
 from ropemother.client.request import (
     RequestClient,
     RequestService,
@@ -47,7 +48,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:37:55+00:00"
+__date__ = "2026-07-09T02:58:04+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -116,6 +117,12 @@ class DirectMessageBus(MessageBus):
 
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         self._core.set_capture_sink(capture_sink)
+
+    def capture_source(self) -> CaptureRecordSource | None:
+        return self._core.capture_source()
+
+    def format_table(self) -> PortableFormatTable:
+        return self._core.format_table()
 
     def create_transport_session(
         self, *, channel: FrameChannel, format_table: PortableFormatTable

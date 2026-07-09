@@ -16,8 +16,8 @@ __status__ = "Development"
 
 _EXPORTS = {
     "AsyncDirectMessageBus": "ropemother.broker.asyncdirect",
-    "CaptureMode": "ropemother.broker.directcore",
     "CAPTURE_PORTABLE_FORMAT": "ropemother.format.portableformat",
+    "CaptureMode": "ropemother.broker.directcore",
     "DirectMessageBus": "ropemother.broker.direct",
     "InMemoryCaptureSink": "ropemother.capture.memorysink",
     "JSONLinesCaptureSink": "ropemother.capture.filesink",
