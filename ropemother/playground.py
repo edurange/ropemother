@@ -146,7 +146,7 @@ from ropemother.util.onelinejson import oneline_deserialize, oneline_serialize
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T18:04:34+00:00"
+__date__ = "2026-07-09T18:58:53+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -6858,7 +6858,7 @@ async def demo_async_socket_service_history_facade() -> None:
             bus=bus, listener=listener
         )
         history = JSONLinesCaptureHistory(
-            capture_path, format_registry=format_registry
+            capture_path, extra_formats=format_registry.formats()
         )
         history_service = bus.create_history_service(
             history=history,
@@ -6932,7 +6932,7 @@ def demo_local_message_bus_host_broker_history() -> None:
         format_registry = default_portable_format_registry()
         sink = JSONLinesCaptureSink(capture_path, append=False)
         history = JSONLinesCaptureHistory(
-            capture_path, format_registry=format_registry
+            capture_path, extra_formats=format_registry.formats()
         )
 
         host = LocalMessageBusHost(

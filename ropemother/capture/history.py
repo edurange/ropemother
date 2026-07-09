@@ -19,6 +19,7 @@ from ropemother.format.formattable import (
     PortableFormatTable,
     PortableFormatTableError,
 )
+from ropemother.format.portableformat import PortableFormat
 from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, CapturedMessage
 from ropemother.message.registrationtable import (
@@ -30,7 +31,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:23:58+00:00"
+__date__ = "2026-07-09T18:50:28+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -108,15 +109,23 @@ class InMemoryCaptureHistory(MessageHistory):
         self,
         source: CaptureRecordSource,
         *,
-        format_registry: PortableFormatTable | None = None,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     ) -> None:
-        if format_registry is None:
-            format_registry = default_portable_format_registry()
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
+        self._initialize(source, format_registry=format_registry)
 
-        self._source = source
-        self._format_registry = format_registry
-        self._registrations = MessageRegistrationTable()
-        self._indexed_record_count = 0
+    @classmethod
+    def _from_format_registry(
+        cls,
+        source: CaptureRecordSource,
+        *,
+        format_registry: PortableFormatTable,
+    ) -> "InMemoryCaptureHistory":
+        history = cls.__new__(cls)
+        history._initialize(source, format_registry=format_registry)
+        return history
 
     @override
     def select(
@@ -179,6 +188,17 @@ class InMemoryCaptureHistory(MessageHistory):
             entries=tuple(entries), next_sequence=next_sequence
         )
         return page
+
+    def _initialize(
+        self,
+        source: CaptureRecordSource,
+        *,
+        format_registry: PortableFormatTable,
+    ) -> None:
+        self._source = source
+        self._format_registry = format_registry
+        self._registrations = MessageRegistrationTable()
+        self._indexed_record_count = 0
 
     def _refresh_registrations(self) -> None:
         record_count = self._source.capture_record_count

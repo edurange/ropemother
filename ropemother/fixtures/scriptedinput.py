@@ -33,7 +33,7 @@ from ropemother.util.onelinejson import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:26:24+00:00"
+__date__ = "2026-07-09T18:56:52+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -78,21 +78,22 @@ class ScriptedInputPlan:
         cls,
         path: str | Path,
         *,
-        format_registry: PortableFormatTable | None = None,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     ) -> "ScriptedInputPlan":
         source_path = Path(path)
         text = source_path.read_text(encoding="utf-8")
-        return cls.from_jsonl_text(text, format_registry=format_registry)
+        return cls.from_jsonl_text(text, extra_formats=extra_formats)
 
     @classmethod
     def from_jsonl_text(
         cls,
         text: str,
         *,
-        format_registry: PortableFormatTable | None = None,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     ) -> "ScriptedInputPlan":
-        if format_registry is None:
-            format_registry = default_portable_format_registry()
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
 
         events: list[ScriptedInputEvent] = []
         for line_number, line in enumerate(text.splitlines(), start=1):
@@ -113,10 +114,11 @@ class ScriptedInputPlan:
         cls,
         records: Iterable[JSONRecord],
         *,
-        format_registry: PortableFormatTable | None = None,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
     ) -> "ScriptedInputPlan":
-        if format_registry is None:
-            format_registry = default_portable_format_registry()
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
 
         events: list[ScriptedInputEvent] = []
         for index, record in enumerate(records):

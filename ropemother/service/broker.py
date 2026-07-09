@@ -15,8 +15,6 @@ from ropemother.capture.filesink import JSONLinesCaptureSink
 from ropemother.capture.filehistory import JSONLinesCaptureHistory
 from ropemother.capture.history import MessageHistory
 from ropemother.capture.sink import CaptureSink
-from ropemother.format.defaults import default_portable_format_registry
-from ropemother.format.registry import PortableFormatRegistry
 from ropemother.service.brokerextension import BrokerExtension
 from ropemother.service.brokerhistory import BrokerHistoryExtension
 from ropemother.service.environment import BUS_CONTACT_URI_VARIABLE
@@ -27,7 +25,7 @@ from ropemother.service.host import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:54:59+00:00"
+__date__ = "2026-07-09T19:58:12+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev1"
 __status__ = "Development"
@@ -82,14 +80,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         runtime_directory = _runtime_directory_from_arguments(args)
 
-    format_registry = default_portable_format_registry()
-
     capture_path = _capture_path_from_arguments(args, runtime_directory)
     capture_mode = _capture_mode_from_arguments(args)
     capture_sink = _capture_sink_from_arguments(args, capture_path)
-    broker_extensions = _broker_extensions_from_arguments(
-        args, format_registry, capture_path
-    )
+    broker_extensions = _broker_extensions_from_arguments(args, capture_path)
 
     try:
         serve_local_message_bus(
@@ -207,12 +201,10 @@ def _capture_path_from_arguments(
 
 
 def _broker_extensions_from_arguments(
-    args: Namespace,
-    format_registry: PortableFormatRegistry,
-    capture_path: Path | None,
+    args: Namespace, capture_path: Path | None
 ) -> list[BrokerExtension]:
     broker_extensions = []
-    history = _history_from_arguments(args, format_registry, capture_path)
+    history = _history_from_arguments(args, capture_path)
     if history is not None:
         broker_extensions.append(BrokerHistoryExtension(history))
 
@@ -220,9 +212,7 @@ def _broker_extensions_from_arguments(
 
 
 def _history_from_arguments(
-    args: Namespace,
-    format_registry: PortableFormatRegistry,
-    capture_path: Path | None,
+    args: Namespace, capture_path: Path | None
 ) -> MessageHistory | None:
     if not args.history:
         return None
@@ -234,11 +224,7 @@ def _history_from_arguments(
 
     capture_path.parent.mkdir(parents=True, exist_ok=True)
     capture_path.touch(exist_ok=True)
-    history = JSONLinesCaptureHistory(
-        capture_path,
-        format_registry=format_registry,
-    )
-    return history
+    return JSONLinesCaptureHistory(capture_path)
 
 
 if __name__ == "__main__":
