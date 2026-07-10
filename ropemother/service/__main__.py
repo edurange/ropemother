@@ -5,15 +5,15 @@
 
 import sys
 
-from ropemother.service.broker import main
+from ropemother.service.broker import run_local_broker_command
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-06-29T19:11:49+00:00"
+__date__ = "2026-07-10T22:43:52+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(run_local_broker_command())
