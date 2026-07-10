@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:23:01+00:00"
+__date__ = "2026-07-10T22:22:45+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -366,7 +366,6 @@ class DirectBrokerCore:
     def format_registry(self) -> PortableFormatRegistry:
         return self._format_registry
 
-    # Is it possible to preserve more type information than Any here?
     def emit_from(
         self,
         *,
@@ -431,7 +430,9 @@ class DirectBrokerCore:
             msg_type=resolved_msg_type,
             payload_format=payload_format,
         )
-        payload = payload_format.decode(serialized_payload.payload_bytes)
+        payload = self._decode_payload(
+            serialized_payload=serialized_payload, msg_format=payload_format
+        )
 
         self._deliver(
             payload=payload,
@@ -480,8 +481,11 @@ class DirectBrokerCore:
         serialized_payload = self._serialize_payload(
             payload=payload, msg_format=msg_format, msg_format_id=msg_format_id
         )
+        decoded_payload = self._decode_payload(
+            serialized_payload=serialized_payload, msg_format=msg_format
+        )
         self._deliver(
-            payload=payload,
+            payload=decoded_payload,
             serialized_payload=serialized_payload,
             msg_topic=msg_topic,
             msg_type=msg_type,
@@ -597,6 +601,21 @@ class DirectBrokerCore:
         payload = SerializedPayload(
             format_id=msg_format_id, payload_bytes=data
         )
+        return payload
+
+    def _decode_payload(
+        self,
+        *,
+        serialized_payload: SerializedPayload,
+        msg_format: PortableFormat[Any, Any],
+    ) -> Any:
+        try:
+            payload = msg_format.decode(serialized_payload.payload_bytes)
+        except (TypeError, ValueError) as e:
+            raise PayloadSerializationError(
+                "message payload could not be decoded with message format "
+                f"{msg_format.key.registration_key!r}"
+            ) from e
         return payload
 
     def _capture_format_event(
