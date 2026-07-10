@@ -146,11 +146,15 @@ from ropemother.transport.sessionrunner import BrokerTransportSessionRunner
 from ropemother.transport.socketconnection import SocketFrameConnection
 from ropemother.transport.zeromq.connection import ZMQFrameConnection
 from ropemother.util.onelinejson import oneline_deserialize, oneline_serialize
-from ropemother.util.serializer import IDENTITY_SERIALIZER, IdentityAdapter
+from ropemother.util.serializer import (
+    IDENTITY_SERIALIZER,
+    IdentityAdapter,
+    TypeAdapter,
+)
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T18:58:53+00:00"
+__date__ = "2026-07-10T22:29:48+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -7070,7 +7074,152 @@ def demo_jsonl_capture_history_uses_extra_formats() -> None:
     print("\n")
 
 
-def main() -> None:
+@dataclass(frozen=True, kw_only=True)
+class _BoundarySourcePayload:
+    value: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class _BoundaryReceivedPayload:
+    value: str
+
+
+class _BoundaryPayloadAdapter(TypeAdapter[Any, bytes]):
+    def encode(self, value: Any) -> bytes:
+        if not isinstance(value, _BoundarySourcePayload):
+            raise TypeError(
+                "boundary payload demo can only encode source payloads"
+            )
+        return value.value.encode("utf-8")
+
+    def decode(self, data: bytes) -> Any:
+        value = data.decode("utf-8")
+        return _BoundaryReceivedPayload(value=value)
+
+
+DEMO_BOUNDARY_PAYLOAD_FORMAT = PortableFormat[Any, bytes](
+    key=PortableFormatKey.from_str("demo-boundary-payload"),
+    adapter=_BoundaryPayloadAdapter(),
+    serializer=IDENTITY_SERIALIZER,
+)
+
+
+def demo_direct_bus_delivers_decoded_payload_boundary() -> None:
+    print("Demo: direct bus delivers decoded payload boundary")
+    bus = DirectMessageBus(
+        extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
+        capture_sink=InMemoryCaptureSink(),
+    )
+    receiver = bus.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+        payload_format=DEMO_BOUNDARY_PAYLOAD_FORMAT,
+    )
+    source_payload = _BoundarySourcePayload(value="foo bar")
+    canonical_received_payload = _BoundaryReceivedPayload(value="foo bar")
+
+    emitter.emit(source_payload)
+    received_payload = receiver.receive().payload
+
+    print(f"{source_payload=}")
+    print(f"{canonical_received_payload=}")
+    print(f"{received_payload=}")
+
+    payload_success = received_payload == canonical_received_payload
+    eq_string = "=="
+    if not payload_success:
+        eq_string = "!="
+    print("received_payload " + eq_string + " canonical_received_payload")
+
+    boundary_success = received_payload is not source_payload
+    identity_string = "is not"
+    if not boundary_success:
+        identity_string = "is"
+    print("received_payload " + identity_string + " source_payload")
+
+    success = payload_success and boundary_success
+    print(f"({type(bus).__name__}): ", end="")
+    if success:
+        print("Receiver saw the decoded message boundary payload")
+    else:
+        print("Receiver saw the original emit object or wrong payload")
+    print("\n")
+
+
+def demo_transport_client_delivers_decoded_payload_boundary() -> None:
+    print("Demo: transport client delivers decoded payload boundary")
+    bus = DirectMessageBus(
+        extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
+        capture_sink=InMemoryCaptureSink(),
+    )
+    format_registry = PortableFormatRegistry(DEMO_BOUNDARY_PAYLOAD_FORMAT)
+    producer_client, producer_session = _make_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=MemoryFrameConnection.make_pair(),
+    )
+    subscriber_client, subscriber_session = _make_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=MemoryFrameConnection.make_pair(),
+    )
+
+    worker = _service_transport_session(producer_session, 1)
+    emitter = producer_client.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+        payload_format=DEMO_BOUNDARY_PAYLOAD_FORMAT,
+    )
+    worker.join()
+
+    worker = _service_transport_session(subscriber_session, 1)
+    receiver = subscriber_client.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    worker.join()
+
+    source_payload = _BoundarySourcePayload(value="baz qux")
+    canonical_received_payload = _BoundaryReceivedPayload(value="baz qux")
+    worker = _service_transport_session(producer_session, 1)
+    emitter.emit(source_payload)
+    worker.join()
+    received_payload = receiver.receive().payload
+
+    print(f"{source_payload=}")
+    print(f"{canonical_received_payload=}")
+    print(f"{received_payload=}")
+
+    payload_success = received_payload == canonical_received_payload
+    eq_string = "=="
+    if not payload_success:
+        eq_string = "!="
+    print("received_payload " + eq_string + " canonical_received_payload")
+
+    boundary_success = received_payload is not source_payload
+    identity_string = "is not"
+    if not boundary_success:
+        identity_string = "is"
+    print("received_payload " + identity_string + " source_payload")
+
+    success = payload_success and boundary_success
+    print(f"({type(subscriber_client).__name__}): ", end="")
+    if success:
+        print("Receiver saw the decoded message boundary payload")
+    else:
+        print("Receiver saw the original emit object or wrong payload")
+    print("\n")
+
+
+def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
     demo_late_capture_sink_replays_registered_symbols()
@@ -7171,7 +7320,9 @@ def main() -> None:
     demo_local_message_bus_host_broker_history()
     demo_history_for_shares_live_format_registry()
     demo_jsonl_capture_history_uses_extra_formats()
+    demo_direct_bus_delivers_decoded_payload_boundary()
+    demo_transport_client_delivers_decoded_payload_boundary()
 
 
 if __name__ == "__main__":
-    main()
+    run_all_demos()
