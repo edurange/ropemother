@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ropemother/util/onelinejson.py
 
-"""An single-line-JSON serialization discipline."""
+"""Serializer for single-line JSON records."""
 
 import json
 from typing import Final, TypeAlias
@@ -10,7 +10,7 @@ from ropemother.util.serializer import Serializer
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-11T01:29:51+00:00"
+__date__ = "2026-07-11T02:25:18+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -43,7 +43,7 @@ def oneline_deserialize(data: str) -> JSONValue:
     return json.loads(data)
 
 
-class JSONLSerializer(Serializer[JSONValue]):
+class JSONLSerializer(Serializer[JSONRecord]):
     """Serializer for single-line JSON values."""
     _encoding: str
 
@@ -51,12 +51,24 @@ class JSONLSerializer(Serializer[JSONValue]):
         self._encoding: str = encoding
 
     def encode(self, record: JSONRecord) -> bytes:
+        if not isinstance(record, dict):
+            raise SerializationError(
+                "single-line JSON serializer requires a JSON record"
+            )
+
         json_string = oneline_serialize(record)
         return json_string.encode(self._encoding)
 
     def decode(self, data: bytes) -> JSONRecord:
         json_string = data.decode(self._encoding)
-        return oneline_deserialize(json_string)
+        value = oneline_deserialize(json_string)
+
+        if not isinstance(value, dict):
+            raise SerializationError(
+                "single-line JSON payload must contain a JSON record"
+            )
+
+        return value
 
 
-JSONL_SERIALIZER: Final[Serializer[JSONValue]] = JSONLSerializer()
+JSONL_SERIALIZER: Final[Serializer[JSONRecord]] = JSONLSerializer()
