@@ -4,15 +4,20 @@
 """Portable format definitions for message bus payload representation."""
 
 from dataclasses import dataclass
-from typing import TypeVar
+from typing import Final, TypeVar
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.util.compositeblobserializer import (
-    CompositeBlobSerializer, CompositeRecord
+    CompositeRecord,
+    COMPOSITE_BLOB_SERIALIZER,
 )
-from ropemother.util.onelinejson import JSONRecord, JSONLSerializer
+from ropemother.util.onelinejson import JSONL_SERIALIZER, JSONRecord
 from ropemother.util.serializer import (
-    IDENTITY_SERIALIZER, IdentityAdapter, Serializer, TypeAdapter
+    IDENTITY_BYTES_ADAPTER,
+    IDENTITY_SERIALIZER,
+    IdentityAdapter,
+    Serializer,
+    TypeAdapter,
 )
 from ropemother.util.symbol import (
     Symbol,
@@ -22,7 +27,7 @@ from ropemother.util.symbol import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T03:14:47+00:00"
+__date__ = "2026-07-11T01:41:44+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -151,25 +156,27 @@ def _validate_portable_format_version(version: str) -> None:
             )
 
 
-RAW_BYTES_PORTABLE_FORMAT = PortableFormat[bytes, bytes](
-    key=PortableFormatKey.from_str("raw-bytes"),
-    adapter=IdentityAdapter[bytes](),
+RAW_BYTES_FORMAT_KEY: Final = PortableFormatKey.from_str("raw-bytes")
+JSON_FORMAT_KEY: Final = PortableFormatKey.from_str("json")
+COMPOSITE_FORMAT_KEY: Final = PortableFormatKey.from_str("composite-json")
+
+JSON_RECORD_ADAPTER: Final = IdentityAdapter[JSONRecord]()
+COMPOSITE_RECORD_ADAPTER: Final = IdentityAdapter[CompositeRecord]()
+
+RAW_BYTES_PORTABLE_FORMAT: Final = PortableFormat(
+    key=RAW_BYTES_FORMAT_KEY,
+    adapter=IDENTITY_BYTES_ADAPTER,
     serializer=IDENTITY_SERIALIZER,
 )
 
-
-JSON_PORTABLE_FORMAT = PortableFormat[JSONRecord, JSONRecord](
-    key=PortableFormatKey.from_str("json"),
-    adapter=IdentityAdapter[JSONRecord](),
-    serializer=JSONLSerializer(),
+JSON_PORTABLE_FORMAT: Final = PortableFormat(
+    key=JSON_FORMAT_KEY,
+    adapter=JSON_RECORD_ADAPTER,
+    serializer=JSONL_SERIALIZER,
 )
 
-
-COMPOSITE_PORTABLE_FORMAT = PortableFormat[
-    CompositeRecord,
-    CompositeRecord,
-](
-    key=PortableFormatKey.from_str("composite-json"),
-    adapter=IdentityAdapter[CompositeRecord](),
-    serializer=CompositeBlobSerializer(),
+COMPOSITE_PORTABLE_FORMAT: Final = PortableFormat(
+    key=COMPOSITE_FORMAT_KEY,
+    adapter=COMPOSITE_RECORD_ADAPTER,
+    serializer=COMPOSITE_BLOB_SERIALIZER,
 )

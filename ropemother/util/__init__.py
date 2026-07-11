@@ -9,7 +9,7 @@ from ropemother.util.compositeblobserializer import (
     CompositeValue,
 )
 from ropemother.util.onelinejson import (
-    JSONLSerializer,
+    JSONL_SERIALIZER,
     JSONPrimitive,
     JSONRecord,
     JSONValue,
@@ -26,7 +26,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T02:05:12+00:00"
+__date__ = "2026-07-11T01:19:10+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -37,7 +37,7 @@ __all__ = [
     "CompositeValue",
     "IDENTITY_SERIALIZER",
     "IdentityAdapter",
-    "JSONLSerializer",
+    "JSONL_SERIALIZER",
     "JSONPrimitive",
     "JSONRecord",
     "JSONValue",

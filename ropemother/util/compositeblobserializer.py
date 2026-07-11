@@ -4,7 +4,7 @@
 """A Serializer strategy using JSONL headers with binary attachments."""
 
 from collections.abc import Sequence
-from typing import cast, TypeAlias
+from typing import cast, Final, TypeAlias
 
 from ropemother.util.lengthprefixed import (
     pack_prefixed_sequence,
@@ -72,6 +72,11 @@ class CompositeBlobSerializer(Serializer[CompositeRecord]):
         )
 
         return cast(CompositeRecord, reconstruct(structural_record, blobs))
+
+
+COMPOSITE_BLOB_SERIALIZER: Final[Serializer[CompositeRecord]] = (
+    CompositeBlobSerializer()
+)
 
 
 def deconstruct(value: CompositeValue, blobs: list[bytes]) -> JSONValue:

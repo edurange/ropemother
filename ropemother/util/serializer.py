@@ -10,10 +10,15 @@ from ropemother.exceptions import MessageBusBaseException
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-03T04:02:12+00:00"
+__date__ = "2026-07-11T01:35:15+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
+
+
+class SerializationError(MessageBusBaseException):  # Clean this up more later
+    """Raised when serialization or adaptation fails."""
+    pass
 
 
 class TypeAdapter[DomainT, SerializableT](ABC):
@@ -40,9 +45,9 @@ class IdentityAdapter[T](TypeAdapter[T, T]):
         return value
 
 
-class SerializationError(MessageBusBaseException):  # Clean this up more later
-    """Raised when serialization or adaptation fails."""
-    pass
+IDENTITY_BYTES_ADAPTER: Final[TypeAdapter[bytes, bytes]] = (
+    IdentityAdapter[bytes]()
+)
 
 
 class Serializer[T](TypeAdapter[T, bytes]):

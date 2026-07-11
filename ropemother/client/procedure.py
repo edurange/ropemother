@@ -6,16 +6,16 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Final
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat, PortableFormatKey
-from ropemother.util.onelinejson import JSONRecord, JSONValue, JSONLSerializer
+from ropemother.util.onelinejson import JSONL_SERIALIZER, JSONRecord
 from ropemother.util.serializer import TypeAdapter
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:08:38+00:00"
+__date__ = "2026-07-11T01:46:16+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -140,11 +140,12 @@ def _read_keyword_arguments(record: JSONRecord) -> dict[str, Any]:
     return keyword_arguments
 
 
-PROCEDURE_INVOCATION_JSON_FORMAT = PortableFormat[
-    ProcedureInvocation,
-    JSONValue,
-](
-    key=PortableFormatKey.from_str("procedure-invocation-json"),
-    adapter=ProcedureInvocationJSONAdapter(),
-    serializer=JSONLSerializer(),
+PROCEDURE_INVOCATION_JSON_KEY: Final = PortableFormatKey.from_str(
+    "procedure-invocation-json"
+)
+PROCEDURE_INVOCATION_JSON_ADAPTER: Final = ProcedureInvocationJSONAdapter()
+PROCEDURE_INVOCATION_JSON_FORMAT: Final = PortableFormat(
+    key=PROCEDURE_INVOCATION_JSON_KEY,
+    adapter=PROCEDURE_INVOCATION_JSON_ADAPTER,
+    serializer=JSONL_SERIALIZER,
 )

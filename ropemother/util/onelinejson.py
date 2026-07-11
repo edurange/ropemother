@@ -4,13 +4,13 @@
 """An single-line-JSON serialization discipline."""
 
 import json
-from typing import TypeAlias
+from typing import Final, TypeAlias
 
 from ropemother.util.serializer import Serializer
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T20:05:44+00:00"
+__date__ = "2026-07-11T01:29:51+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -57,3 +57,6 @@ class JSONLSerializer(Serializer[JSONValue]):
     def decode(self, data: bytes) -> JSONRecord:
         json_string = data.decode(self._encoding)
         return oneline_deserialize(json_string)
+
+
+JSONL_SERIALIZER: Final[Serializer[JSONValue]] = JSONLSerializer()
