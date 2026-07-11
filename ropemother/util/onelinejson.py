@@ -26,7 +26,7 @@ JSONValue: TypeAlias = (
 JSONRecord: TypeAlias = dict[str, JSONValue]
 
 
-def oneline_serialize(data: JSONValue) -> bytes:
+def oneline_serialize(data: JSONValue) -> str:
     """Serialize a JSON value as one newline-terminated record."""
     json_string = json.dumps(
         data,
