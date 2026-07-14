@@ -6,11 +6,11 @@
 from ropemother.broker.asyncdirect import AsyncDirectMessageBus
 from ropemother.broker.direct import DirectMessageBus
 from ropemother.capture.history import InMemoryCaptureHistory
-from ropemother.capture.memorysink import InMemoryCaptureSink
+from ropemother.exceptions import CaptureUnavailableError
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T20:22:54+00:00"
+__date__ = "2026-07-14T15:34:02+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -23,9 +23,9 @@ def history_for(bus: CaptureHistoryBus) -> InMemoryCaptureHistory:
     """Build an in-memory history view for a configured direct bus."""
     source = bus.capture_source()
     if source is None:
-        sink = InMemoryCaptureSink()
-        bus.set_capture_sink(sink)
-        source = sink
+        raise CaptureUnavailableError(
+            "history_for requires an attached readable capture sink"
+        )
 
     history = InMemoryCaptureHistory._from_format_registry(
         source, format_registry=bus._format_registry()

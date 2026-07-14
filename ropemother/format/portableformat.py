@@ -11,7 +11,7 @@ from ropemother.util.compositeblobserializer import (
     CompositeRecord,
     COMPOSITE_BLOB_SERIALIZER,
 )
-from ropemother.util.onelinejson import JSONL_SERIALIZER, JSONRecord
+from ropemother.util.onelinejson import JSONL_SERIALIZER, JSONValue
 from ropemother.util.serializer import (
     IDENTITY_BYTES_ADAPTER,
     IDENTITY_SERIALIZER,
@@ -27,7 +27,7 @@ from ropemother.util.symbol import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-11T01:41:44+00:00"
+__date__ = "2026-07-14T15:36:43+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -160,7 +160,7 @@ RAW_BYTES_FORMAT_KEY: Final = PortableFormatKey.from_str("raw-bytes")
 JSON_FORMAT_KEY: Final = PortableFormatKey.from_str("json")
 COMPOSITE_FORMAT_KEY: Final = PortableFormatKey.from_str("composite-json")
 
-JSON_RECORD_ADAPTER: Final = IdentityAdapter[JSONRecord]()
+JSON_VALUE_ADAPTER: Final = IdentityAdapter[JSONValue]()
 COMPOSITE_RECORD_ADAPTER: Final = IdentityAdapter[CompositeRecord]()
 
 RAW_BYTES_PORTABLE_FORMAT: Final = PortableFormat(
@@ -171,7 +171,7 @@ RAW_BYTES_PORTABLE_FORMAT: Final = PortableFormat(
 
 JSON_PORTABLE_FORMAT: Final = PortableFormat(
     key=JSON_FORMAT_KEY,
-    adapter=JSON_RECORD_ADAPTER,
+    adapter=JSON_VALUE_ADAPTER,
     serializer=JSONL_SERIALIZER,
 )
 

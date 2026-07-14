@@ -154,7 +154,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-10T22:29:48+00:00"
+__date__ = "2026-07-14T15:18:21+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev2"
 __status__ = "Development"
@@ -7219,6 +7219,30 @@ def demo_transport_client_delivers_decoded_payload_boundary() -> None:
     print("\n")
 
 
+def demo_history_for_requires_readable_capture_sink() -> None:
+    print("Demo: history_for requires readable capture sink")
+    bus = DirectMessageBus()
+
+    try:
+        history_for(bus)
+        missing_sink_rejected = False
+    except CaptureUnavailableError:
+        missing_sink_rejected = True
+    print(f"{missing_sink_rejected=}")
+
+    eq_string = "=="
+    if not missing_sink_rejected:
+        eq_string = "!="
+    print("missing_sink_rejected" + eq_string + "True")
+
+    print(f"({history_for.__name__}): ", end="")
+    if missing_sink_rejected:
+        print("Missing readable capture sink was rejected")
+    else:
+        print("Missing capture sink was silently attached")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7322,6 +7346,7 @@ def run_all_demos() -> None:
     demo_jsonl_capture_history_uses_extra_formats()
     demo_direct_bus_delivers_decoded_payload_boundary()
     demo_transport_client_delivers_decoded_payload_boundary()
+    demo_history_for_requires_readable_capture_sink()
 
 
 if __name__ == "__main__":
