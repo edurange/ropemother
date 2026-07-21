@@ -10,10 +10,10 @@ from pathlib import Path
 from time import sleep
 from typing import Any, Iterable
 
-from ropemother.broker.asyncbase import AsyncMessageBus
 from ropemother.broker.asyncendpoints import AsyncEmitter
-from ropemother.broker.base import MessageBus
 from ropemother.broker.endpoints import Emitter
+from ropemother.client.asyncendpointfactory import AsyncMessageEndpointFactory
+from ropemother.client.endpointfactory import MessageEndpointFactory
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.defaults import default_portable_format_registry
 from ropemother.format.formattable import PortableFormatTable
@@ -33,7 +33,7 @@ from ropemother.util.onelinejson import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-21T18:20:36+00:00"
+__date__ = "2026-07-21T21:57:47+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -139,11 +139,13 @@ class _EmitterKey:
 
 class ScriptedInputEmitter:
     """Fixture that emits a scripted input plan on a sync bus."""
-    _bus: MessageBus
+    _bus: MessageEndpointFactory
     _plan: ScriptedInputPlan
     _emitters: dict[_EmitterKey, Emitter]
 
-    def __init__(self, bus: MessageBus, plan: ScriptedInputPlan) -> None:
+    def __init__(
+        self, bus: MessageEndpointFactory, plan: ScriptedInputPlan
+    ) -> None:
         self._bus = bus
         self._plan = plan
         self._emitters = {}
@@ -191,12 +193,12 @@ class ScriptedInputEmitter:
 
 class AsyncScriptedInputEmitter:
     """Fixture that emits a scripted input plan on an async bus."""
-    _bus: AsyncMessageBus
+    _bus: AsyncMessageEndpointFactory
     _plan: ScriptedInputPlan
     _emitters: dict[_EmitterKey, AsyncEmitter]
 
     def __init__(
-        self, bus: AsyncMessageBus, plan: ScriptedInputPlan
+        self, bus: AsyncMessageEndpointFactory, plan: ScriptedInputPlan
     ) -> None:
         self._bus = bus
         self._plan = plan
