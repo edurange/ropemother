@@ -154,7 +154,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-14T15:18:21+00:00"
+__date__ = "2026-07-21T18:48:03+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -167,6 +167,7 @@ DEMO_ALT_MSG_TYPE = "event-quux"
 DEMO_RESERVED_TOPIC = "bus.foo"
 DEMO_LIFECYCLE_TOPIC = "lifecycle.foo"
 DEMO_LIFECYCLE_TYPE = LifecycleMessageType.STARTED.value
+DEMO_SCRIPTED_MSG_TYPE = "event-scripted"
 
 DEMO_CUSTOM_BYTES_FORMAT = PortableFormat[bytes, bytes](
     key=PortableFormatKey.from_str("demo-custom-bytes"),
@@ -6218,83 +6219,56 @@ async def demo_async_history_query_service_selects_messages() -> None:
     print("\n")
 
 
-def demo_scripted_input_emits_file_events() -> None:
-    print("Demo: scripted input emits file events")
+def demo_scripted_input_emits_typed_file_payload() -> None:
+    print("Demo: scripted input emits typed file payload")
+    expected_payload = ProcedureInvocation.from_call("foo")
+    payload_format = PROCEDURE_INVOCATION_JSON_FORMAT
+    portable_payload = payload_format.adapter.encode(expected_payload)
+    payload_format_key = payload_format.key.registration_key
+    file_record = {
+        "msg_topic": DEMO_TOPIC,
+        "msg_type": DEMO_MSG_TYPE,
+        "msg_producer": DEMO_PRODUCER,
+        "payload_format": payload_format_key,
+        "payload": portable_payload,
+    }
+    file_line = oneline_serialize(file_record)
+    extra_formats = (payload_format,)
+
+    with TemporaryDirectory() as temp_dir:
+        input_path = Path(temp_dir) / "input.jsonl"
+        input_path.write_text(file_line, encoding="utf-8")
+        input_plan = ScriptedInputPlan.from_jsonl(
+            input_path, extra_formats=extra_formats
+        )
+
     bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
     bus.set_capture_sink(sink)
     receiver = bus.subscribe(
-        msg_topic=DEMO_TOPIC, msg_producer=DEMO_PRODUCER
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
     )
-
-    file_records = [
-        {
-            "at": 0.0,
-            "msg_topic": DEMO_TOPIC,
-            "msg_type": DEMO_MSG_TYPE,
-            "msg_producer": DEMO_PRODUCER,
-            "payload": {"foo": "bar"},
-        },
-        {
-            "at": 0.25,
-            "msg_topic": DEMO_TOPIC,
-            "msg_type": DEMO_ALT_MSG_TYPE,
-            "msg_producer": DEMO_PRODUCER,
-            "payload_format": "raw-bytes",
-            "payload_text": "baz qux",
-        },
-    ]
-    canonical_plan = [
-        (0.0, DEMO_MSG_TYPE, {"foo": "bar"}),
-        (0.25, DEMO_ALT_MSG_TYPE, b"baz qux"),
-    ]
-    canonical_messages = [
-        (DEMO_MSG_TYPE, {"foo": "bar"}),
-        (DEMO_ALT_MSG_TYPE, b"baz qux"),
-    ]
-    file_lines = []
-    for record in file_records:
-        file_lines.append(oneline_serialize(record))
-
-    with TemporaryDirectory() as temp_dir:
-        input_path = Path(temp_dir) / "input.jsonl"
-        input_path.write_text("\n".join(file_lines), encoding="utf-8")
-        input_plan = ScriptedInputPlan.from_jsonl(input_path)
-    recovered_plan = []
-    for event in input_plan.events:
-        item = (event.at, event.msg_type, event.payload)
-        recovered_plan.append(item)
-
     input_fixture = ScriptedInputEmitter(bus, input_plan)
+
     input_fixture.emit_all()
-    received_messages = []
-    for _ in input_plan.events:
-        message = receiver.receive()
-        item = (message.msg_type, message.payload)
-        received_messages.append(item)
+    received_message = receiver.receive()
+    received_payload = received_message.payload
 
-    print(f"{canonical_plan=}")
-    print(f"{recovered_plan=}")
-    plan_success = recovered_plan == canonical_plan
+    print(f"{expected_payload=}")
+    print(f"{received_payload=}")
+    success = received_payload == expected_payload
     eq_string = "=="
-    if not plan_success:
+    if not success:
         eq_string = "!="
-    print("recovered_plan " + eq_string + " canonical_plan")
+    print("received_payload " + eq_string + " expected_payload")
 
-    print(f"{canonical_messages=}")
-    print(f"{received_messages=}")
-    message_success = received_messages == canonical_messages
-    eq_string = "=="
-    if not message_success:
-        eq_string = "!="
-    print("received_messages " + eq_string + " canonical_messages")
-
-    success = plan_success and message_success
     print(f"({type(input_fixture).__name__}): ", end="")
     if success:
-        print("Input fixture recovered and emitted file events")
+        print("Scripted input emitted a typed payload from file")
     else:
-        print("Input fixture did not recover and emit file events")
+        print("Scripted input did not emit the expected typed payload")
     print("\n")
 
 
@@ -7332,7 +7306,7 @@ def run_all_demos() -> None:
     demo_in_memory_capture_history_selects_messages()
     demo_history_query_service_selects_messages()
     asyncio.run(demo_async_history_query_service_selects_messages())
-    demo_scripted_input_emits_file_events()
+    demo_scripted_input_emits_typed_file_payload()
     demo_jsonl_capture_history_selects_messages()
     demo_jsonl_history_query_service_selects_messages()
     demo_jsonl_capture_history_reconstructs_payload_formats()

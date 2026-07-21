@@ -33,7 +33,7 @@ from ropemother.util.onelinejson import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T18:56:52+00:00"
+__date__ = "2026-07-21T18:20:36+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -275,12 +275,17 @@ def _event_from_record(
 ) -> ScriptedInputEvent:
     format_key = _format_key_from_record(record)
     payload_format = format_registry.from_key(format_key)
+    portable_payload = _payload_from_record(
+        record, payload_format=payload_format
+    )
+    payload = payload_format.adapter.decode(portable_payload)
+
     event = ScriptedInputEvent(
         at=_optional_float(record, "at", line_number=line_number),
         msg_topic=_required_str(record, "msg_topic", line_number),
         msg_type=_required_str(record, "msg_type", line_number),
         msg_producer=_required_str(record, "msg_producer", line_number),
-        payload=_payload_from_record(record, payload_format=payload_format),
+        payload=payload,
         payload_format=payload_format,
     )
     return event
