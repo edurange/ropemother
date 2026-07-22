@@ -12,7 +12,7 @@ from typing import Any, Iterable
 
 from ropemother.broker.asyncendpoints import AsyncEmitter
 from ropemother.broker.endpoints import Emitter
-from ropemother.client.asyncendpointfactory import AsyncMessageEndpointFactory
+from ropemother.client.asyncendpointprovisioner import AsyncEndpointProvisioner
 from ropemother.client.endpointfactory import MessageEndpointFactory
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.defaults import default_portable_format_registry
@@ -193,14 +193,14 @@ class ScriptedInputEmitter:
 
 class AsyncScriptedInputEmitter:
     """Fixture that emits a scripted input plan on an async bus."""
-    _bus: AsyncMessageEndpointFactory
+    _provisioner: AsyncEndpointProvisioner
     _plan: ScriptedInputPlan
     _emitters: dict[_EmitterKey, AsyncEmitter]
 
     def __init__(
-        self, bus: AsyncMessageEndpointFactory, plan: ScriptedInputPlan
+        self, provisioner: AsyncEndpointProvisioner, plan: ScriptedInputPlan
     ) -> None:
-        self._bus = bus
+        self._provisioner = provisioner
         self._plan = plan
         self._emitters = {}
 
@@ -228,14 +228,14 @@ class AsyncScriptedInputEmitter:
         return count
 
     async def emit_event(self, event: ScriptedInputEvent) -> None:
-        emitter = self._emitter_for(event)
+        emitter = await self._emitter_for(event)
         await emitter.emit(event.payload, payload_format=event.payload_format)
 
-    def _emitter_for(self, event: ScriptedInputEvent) -> AsyncEmitter:
+    async def _emitter_for(self, event: ScriptedInputEvent) -> AsyncEmitter:
         key = _emitter_key_for(event)
         emitter = self._emitters.get(key)
         if emitter is None:
-            emitter = self._bus.register_emitter(
+            emitter = await self._provisioner.register_emitter(
                 msg_topic=event.msg_topic,
                 msg_producer=event.msg_producer,
                 msg_type=event.msg_type,

@@ -78,6 +78,7 @@ from ropemother.format.registry import (
     PortableFormatRegistry,
 )
 from ropemother.fixtures.scriptedinput import (
+    AsyncScriptedInputEmitter,
     ScriptedInputEmitter,
     ScriptedInputPlan,
 )
@@ -154,7 +155,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T17:26:30+00:00"
+__date__ = "2026-07-22T18:54:22+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -7218,6 +7219,60 @@ def demo_history_for_requires_readable_capture_sink() -> None:
     print("\n")
 
 
+async def demo_async_scripted_input_emits_typed_file_payload() -> None:
+    print("Demo: async scripted input emits typed file payload")
+    canonical_payload = ProcedureInvocation.from_call("foo")
+    payload_format = PROCEDURE_INVOCATION_JSON_FORMAT
+    portable_payload = payload_format.adapter.encode(canonical_payload)
+    payload_format_key = payload_format.key.registration_key
+    file_record = {
+        "msg_topic": DEMO_TOPIC,
+        "msg_type": DEMO_MSG_TYPE,
+        "msg_producer": DEMO_PRODUCER,
+        "payload_format": payload_format_key,
+        "payload": portable_payload,
+    }
+    file_line = oneline_serialize(file_record)
+    extra_formats = (payload_format,)
+
+    with TemporaryDirectory() as temp_dir:
+        input_path = Path(temp_dir) / "input.jsonl"
+        input_path.write_text(file_line, encoding="utf-8")
+        input_plan = ScriptedInputPlan.from_jsonl(
+            input_path, extra_formats=extra_formats
+        )
+
+    bus = AsyncDirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    receiver = bus.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    provisioner = ImmediateAsyncEndpointProvisioner(bus)
+    input_fixture = AsyncScriptedInputEmitter(provisioner, input_plan)
+
+    await input_fixture.emit_all()
+    received_message = await receiver.receive()
+    received_payload = received_message.payload
+
+    print(f"{canonical_payload=}")
+    print(f"{received_payload=}")
+    success = received_payload == canonical_payload
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_payload " + eq_string + " canonical_payload")
+
+    print(f"({type(input_fixture).__name__}): ", end="")
+    if success:
+        print("Async scripted input emitted a typed payload from file")
+    else:
+        print("Async scripted input did not emit the expected typed payload")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7322,6 +7377,7 @@ def run_all_demos() -> None:
     demo_direct_bus_delivers_decoded_payload_boundary()
     demo_transport_client_delivers_decoded_payload_boundary()
     demo_history_for_requires_readable_capture_sink()
+    asyncio.run(demo_async_scripted_input_emits_typed_file_payload())
 
 
 if __name__ == "__main__":
