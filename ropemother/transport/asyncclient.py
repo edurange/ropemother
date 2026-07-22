@@ -64,7 +64,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:50:46+00:00"
+__date__ = "2026-07-22T16:15:20+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -355,6 +355,10 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         )
         return message
 
+    def _portable_format_table(self) -> PortableFormatRegistry:
+        return self._format_registry
+
+    # Clarify this name later
     def _install_format_policy_formats(
         self, format_policy: TypeFormatPolicy
     ) -> None:

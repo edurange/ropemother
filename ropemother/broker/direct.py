@@ -49,7 +49,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T20:20:46+00:00"
+__date__ = "2026-07-22T16:08:24+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -134,7 +134,7 @@ class DirectMessageBus(MessageBus):
     def capture_source(self) -> CaptureRecordSource | None:
         return self._core.capture_source()
 
-    def _format_registry(self) -> PortableFormatRegistry:
+    def _portable_format_table(self) -> PortableFormatRegistry:
         return self._core.format_registry()
 
     def create_transport_session(

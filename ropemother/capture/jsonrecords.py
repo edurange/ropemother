@@ -27,7 +27,7 @@ from ropemother.util.onelinejson import JSONRecord
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-01T14:40:52+00:00"
+__date__ = "2026-07-22T15:21:12+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -202,7 +202,7 @@ def format_registration_from_record(
     registration_key = record.get("registration_key")
     if not isinstance(registration_key, str):
         raise ValueError("portable format registration key is invalid")
-    key = portable_format_key_from_registration_key(registration_key)
+    key = PortableFormatKey.from_registration_key(registration_key)
 
     registration = PortableFormatRegistration(format_id=format_id, key=key)
     return registration
@@ -233,19 +233,6 @@ def symbol_registration_from_record(
         symbol_kind=symbol_kind, symbol_id=symbol_id, symbol=symbol
     )
     return registration
-
-
-def portable_format_key_from_registration_key(
-    registration_key: str,
-) -> PortableFormatKey:
-    symbol, separator, version = registration_key.partition(":")
-
-    if separator == "":
-        key = PortableFormatKey.from_str(symbol)
-    else:
-        key = PortableFormatKey.from_str(symbol, version=version)
-
-    return key
 
 
 def message_symbol_id(

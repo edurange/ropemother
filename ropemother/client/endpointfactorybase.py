@@ -9,6 +9,7 @@ from typing import Any, Generic, TypeVar
 from ropemother.capture.history import MessageHistory
 from ropemother.client.procedure import PROCEDURE_INVOCATION_JSON_FORMAT
 from ropemother.client.request import RequestClientLimits
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
@@ -23,7 +24,7 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:27:14+00:00"
+__date__ = "2026-07-22T16:21:40+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -90,6 +91,10 @@ class EndpointFactoryBase(
         reply_receiver: ReceiverT,
         request_limits: RequestClientLimits | None,
     ) -> RequesterT:
+        ...
+
+    @abstractmethod
+    def _portable_format_table(self) -> PortableFormatTable:
         ...
 
     @abstractmethod

@@ -4,7 +4,7 @@
 """Portable format definitions for message bus payload representation."""
 
 from dataclasses import dataclass
-from typing import Final, TypeVar
+from typing import Final, Self, TypeVar
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.util.compositeblobserializer import (
@@ -27,7 +27,7 @@ from ropemother.util.symbol import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-14T15:36:43+00:00"
+__date__ = "2026-07-22T15:19:54+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -92,6 +92,15 @@ class PortableFormatKey:
         cls, symbol: str, *, version: str | None = None
     ) -> "PortableFormatKey":
         return cls(symbol=PortableFormatSymbol(symbol), version=version)
+
+    @classmethod
+    def from_registration_key(cls, registration_key: str) -> Self:
+        symbol, separator, version = registration_key.partition(":")
+        if separator == "":
+            key = cls.from_str(symbol)
+        else:
+            key = cls.from_str(symbol, version=version)
+        return key
 
 
 @dataclass(frozen=True, kw_only=True)

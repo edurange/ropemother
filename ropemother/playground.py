@@ -154,7 +154,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-21T18:48:03+00:00"
+__date__ = "2026-07-22T17:26:30+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -6584,7 +6584,7 @@ def demo_history_client_service_facade() -> None:
         msg_topic=DEMO_TOPIC,
         msg_producer=DEMO_PRODUCER,
         msg_type=DEMO_ALT_MSG_TYPE,
-        payload_format=RAW_BYTES_PORTABLE_FORMAT,
+        payload_format=PROCEDURE_INVOCATION_JSON_FORMAT,
     )
 
     requester_name = "requester-foo"
@@ -6611,7 +6611,7 @@ def demo_history_client_service_facade() -> None:
         reply_type_formats={DEMO_ALT_MSG_TYPE: COMPOSITE_PORTABLE_FORMAT},
     )
     primary_emitter.emit({"foo": "bar"})
-    canonical_payload = b"baz qux"
+    canonical_payload = ProcedureInvocation.from_call("foo", bar="baz")
     secondary_emitter.emit(canonical_payload)
     receiver.receive()
     canonical_message = receiver.receive()
@@ -6624,7 +6624,6 @@ def demo_history_client_service_facade() -> None:
     service.handle()
     page = client.receive(handle)
     canonical_msg_id = canonical_message.msg_id
-    canonical_payload = canonical_message.payload
     received_msg_id = None
     received_payload = None
     if len(page.entries) == 1:
@@ -6675,7 +6674,7 @@ async def demo_async_history_client_service_facade() -> None:
         msg_topic=DEMO_TOPIC,
         msg_producer=DEMO_PRODUCER,
         msg_type=DEMO_ALT_MSG_TYPE,
-        payload_format=RAW_BYTES_PORTABLE_FORMAT,
+        payload_format=PROCEDURE_INVOCATION_JSON_FORMAT,
     )
 
     requester_name = "requester-foo"
@@ -6702,7 +6701,8 @@ async def demo_async_history_client_service_facade() -> None:
         reply_type_formats={DEMO_ALT_MSG_TYPE: COMPOSITE_PORTABLE_FORMAT},
     )
     await primary_emitter.emit({"foo": "bar"})
-    await secondary_emitter.emit(b"baz qux")
+    canonical_payload = ProcedureInvocation.from_call("foo", bar="baz")
+    await secondary_emitter.emit(canonical_payload)
     await receiver.receive()
     canonical_message = await receiver.receive()
 
@@ -6714,7 +6714,6 @@ async def demo_async_history_client_service_facade() -> None:
     await service.handle()
     page = await client.receive(handle)
     canonical_msg_id = canonical_message.msg_id
-    canonical_payload = canonical_message.payload
     received_msg_id = None
     received_payload = None
     if len(page.entries) == 1:
@@ -6917,17 +6916,17 @@ def demo_local_message_bus_host_broker_history() -> None:
     with TemporaryDirectory() as runtime_dir:
         runtime_path = Path(runtime_dir)
         capture_path = runtime_path / "capture.jsonl"
-        format_registry = default_portable_format_registry()
         sink = JSONLinesCaptureSink(capture_path, append=False)
         history = JSONLinesCaptureHistory(
-            capture_path, extra_formats=format_registry.formats()
+            capture_path,
+            extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
         )
 
         host = LocalMessageBusHost(
             runtime_directory=runtime_path,
             capture_sink=sink,
             broker_extensions=[BrokerHistoryExtension(history)],
-            extra_formats=format_registry.formats(),
+            extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
         )
         host.start()
 
@@ -6938,9 +6937,11 @@ def demo_local_message_bus_host_broker_history() -> None:
             msg_topic=DEMO_TOPIC,
             msg_producer=DEMO_PRODUCER,
             msg_type=DEMO_MSG_TYPE,
+            payload_format=DEMO_BOUNDARY_PAYLOAD_FORMAT,
         )
-        canonical_payload = {"foo": "bar"}
-        emitter.emit(canonical_payload)
+        source_payload = _BoundarySourcePayload(value="foo bar")
+        canonical_payload = _BoundaryReceivedPayload(value="foo bar")
+        emitter.emit(source_payload)
         page = history_client.select(
             msg_topic=DEMO_TOPIC,
             msg_type=DEMO_MSG_TYPE,

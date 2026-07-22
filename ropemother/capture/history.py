@@ -19,7 +19,7 @@ from ropemother.format.formattable import (
     PortableFormatTable,
     PortableFormatTableError,
 )
-from ropemother.format.portableformat import PortableFormat
+from ropemother.format.portableformat import PortableFormat, PortableFormatKey
 from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, CapturedMessage
 from ropemother.message.registrationtable import (
@@ -31,7 +31,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T18:50:28+00:00"
+__date__ = "2026-07-22T15:23:09+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -61,6 +61,8 @@ class MessageHistoryPayloadDecodeError(ValueError, MessageHistoryError):
 class MessageHistoryEntry:
     """Decoded captured message returned from a history query."""
     payload: Any
+    payload_format_key: PortableFormatKey
+    payload_bytes: bytes
     msg_topic: str
     msg_type: str
     msg_producer: str
@@ -242,39 +244,10 @@ class InMemoryCaptureHistory(MessageHistory):
         return self._registrations.find_producer_id_for(msg_producer)
 
     def _entry_for(self, message: CapturedMessage) -> MessageHistoryEntry:
-        try:
-            msg_topic = self._registrations.topic_for_id(
-                message.msg_topic_id
-            )
-            msg_type = self._registrations.msg_type_for_id(
-                message.msg_type_id
-            )
-            msg_producer = self._registrations.producer_for_id(
-                message.msg_producer_id
-            )
-            entry = MessageHistoryEntry(
-                payload=self._payload_for(message),
-                msg_topic=msg_topic,
-                msg_type=msg_type,
-                msg_producer=msg_producer,
-                msg_id=message.msg_id,
-                bus_operation=message.bus_operation,
-                bus_sequence=message.bus_sequence,
-                topic_sequence=message.topic_sequence,
-                bus_received_at=message.bus_received_at,
-                correlation_id=message.correlation_id,
-                reply_to=message.reply_to,
-            )
-        except UnknownMessageRegistrationError as e:
-            raise IncompleteMessageHistoryError(
-                "history is missing a registration needed to read a message"
-            ) from e
-        return entry
-
-    def _payload_for(self, message: CapturedMessage) -> Any:
         serialized_payload = message.serialized_payload
+
         try:
-            format_key = self._registrations.format_key_for_id(
+            payload_format_key = self._registrations.format_key_for_id(
                 serialized_payload.format_id
             )
         except UnknownMessageRegistrationError as e:
@@ -284,21 +257,59 @@ class InMemoryCaptureHistory(MessageHistory):
             ) from e
 
         try:
-            payload_format = self._format_registry.from_key(format_key)
-        except PortableFormatTableError as e:
-            raise MessageHistoryPayloadDecodeError(
-                "history has no local decoder for payload format "
-                f"{format_key.registration_key!r}"
+            msg_topic = self._registrations.topic_for_id(message.msg_topic_id)
+            msg_type = self._registrations.msg_type_for_id(message.msg_type_id)
+            msg_producer = self._registrations.producer_for_id(
+                message.msg_producer_id
+            )
+        except UnknownMessageRegistrationError as e:
+            raise IncompleteMessageHistoryError(
+                "history is missing a registration needed to read a message"
             ) from e
 
-        try:
-            payload = payload_format.decode(serialized_payload.payload_bytes)
-        except (TypeError, ValueError) as e:
-            raise MessageHistoryPayloadDecodeError(
-                "history payload could not be decoded with format "
-                f"{format_key.registration_key!r}"
-            ) from e
-        return payload
+        payload_bytes = serialized_payload.payload_bytes
+        payload = decode_history_payload(
+            self._format_registry, payload_format_key, payload_bytes
+        )
+        entry = MessageHistoryEntry(
+            payload=payload,
+            payload_format_key=payload_format_key,
+            payload_bytes=payload_bytes,
+            msg_topic=msg_topic,
+            msg_type=msg_type,
+            msg_producer=msg_producer,
+            msg_id=message.msg_id,
+            bus_operation=message.bus_operation,
+            bus_sequence=message.bus_sequence,
+            topic_sequence=message.topic_sequence,
+            bus_received_at=message.bus_received_at,
+            correlation_id=message.correlation_id,
+            reply_to=message.reply_to,
+        )
+        return entry
+
+
+def decode_history_payload(
+    format_table: PortableFormatTable,
+    format_key: PortableFormatKey,
+    payload_bytes: bytes,
+) -> Any:
+    try:
+        payload_format = format_table.from_key(format_key)
+    except PortableFormatTableError as e:
+        raise MessageHistoryPayloadDecodeError(
+            "history has no local decoder for payload format "
+            f"{format_key.registration_key!r}"
+        ) from e
+
+    try:
+        payload = payload_format.decode(payload_bytes)
+    except (TypeError, ValueError) as e:
+        raise MessageHistoryPayloadDecodeError(
+            "history payload could not be decoded with format "
+            f"{format_key.registration_key!r}"
+        ) from e
+    return payload
 
 
 def _validate_selection(selection: HistorySelection) -> None:

@@ -10,7 +10,7 @@ from ropemother.exceptions import CaptureUnavailableError
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-14T15:34:02+00:00"
+__date__ = "2026-07-22T16:09:09+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -28,6 +28,6 @@ def history_for(bus: CaptureHistoryBus) -> InMemoryCaptureHistory:
         )
 
     history = InMemoryCaptureHistory._from_format_registry(
-        source, format_registry=bus._format_registry()
+        source, format_registry=bus._portable_format_table()
     )
     return history

@@ -3,12 +3,13 @@
 
 """Request/reply adapters for message history queries."""
 
-from typing import Any
+from typing import Any, Iterable
 
 from ropemother.capture.history import (
     MessageHistory,
     MessageHistoryEntry,
     MessageHistoryPage,
+    decode_history_payload,
 )
 from ropemother.capture.historyselection import (
     DEFAULT_HISTORY_MAX_COUNT,
@@ -27,21 +28,21 @@ from ropemother.client.request import (
     ServiceRequest,
 )
 from ropemother.exceptions import MessageBusBaseException
+from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
     PortableFormat,
+    PortableFormatKey,
 )
 from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation
-from ropemother.util.compositeblobserializer import (
-    CompositeRecord,
-    CompositeValue,
-)
+from ropemother.util.compositeblobserializer import CompositeRecord
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T03:17:15+00:00"
+__date__ = "2026-07-22T15:45:35+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -66,33 +67,30 @@ class InvalidMessageHistoryRecordError(
     pass
 
 
-class UnsupportedHistoryPayloadError(
-    TypeError, MessageHistoryServiceError
-):
-    """Raised when a history service payload has an unsupported shape."""
-    pass
-
-
 class HistoryClient:
     """Request/reply client for querying captured message history."""
     _client: RequestClient
     _selection_format: PortableFormat[Any, Any]
     _page_format: PortableFormat[Any, Any]
+    _format_registry: PortableFormatTable
 
     def __init__(
         self,
         client: RequestClient,
         *,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         selection_format: PortableFormat[Any, Any] | None = None,
         page_format: PortableFormat[Any, Any] | None = None,
     ) -> None:
-        if selection_format is None:
-            selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
-        if page_format is None:
-            page_format = DEFAULT_HISTORY_PAGE_FORMAT
-        self._client = client
-        self._selection_format = selection_format
-        self._page_format = page_format
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
+        self._initialize(
+            client,
+            format_registry=format_registry,
+            selection_format=selection_format,
+            page_format=page_format,
+        )
 
     def send(
         self,
@@ -122,7 +120,10 @@ class HistoryClient:
 
     def receive(self, handle: RequestHandle) -> MessageHistoryPage:
         reply = self._client.receive(handle)
-        return message_history_page_from_record(reply.payload)
+        page = message_history_page_from_record(
+            reply.payload, format_table=self._format_registry
+        )
+        return page
 
     def select(
         self,
@@ -153,6 +154,41 @@ class HistoryClient:
     @property
     def reply_format(self) -> PortableFormat[Any, Any]:
         return self._page_format
+
+    def _initialize(
+        self,
+        client: RequestClient,
+        *,
+        format_registry: PortableFormatTable,
+        selection_format: PortableFormat[Any, Any] | None,
+        page_format: PortableFormat[Any, Any] | None,
+    ) -> None:
+        if selection_format is None:
+            selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
+        if page_format is None:
+            page_format = DEFAULT_HISTORY_PAGE_FORMAT
+        self._client = client
+        self._selection_format = selection_format
+        self._page_format = page_format
+        self._format_registry = format_registry
+
+    @classmethod
+    def _from_format_registry(
+        cls,
+        client: RequestClient,
+        *,
+        format_registry: PortableFormatTable,
+        selection_format: PortableFormat[Any, Any] | None = None,
+        page_format: PortableFormat[Any, Any] | None = None,
+    ) -> "HistoryClient":
+        history_client = cls.__new__(cls)
+        history_client._initialize(
+            client,
+            format_registry=format_registry,
+            selection_format=selection_format,
+            page_format=page_format,
+        )
+        return history_client
 
 
 class HistoryService:
@@ -218,21 +254,25 @@ class AsyncHistoryClient:
     _client: AsyncRequestClient
     _selection_format: PortableFormat[Any, Any]
     _page_format: PortableFormat[Any, Any]
+    _format_registry: PortableFormatTable
 
     def __init__(
         self,
         client: AsyncRequestClient,
         *,
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
         selection_format: PortableFormat[Any, Any] | None = None,
         page_format: PortableFormat[Any, Any] | None = None,
     ) -> None:
-        if selection_format is None:
-            selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
-        if page_format is None:
-            page_format = DEFAULT_HISTORY_PAGE_FORMAT
-        self._client = client
-        self._selection_format = selection_format
-        self._page_format = page_format
+        format_registry = default_portable_format_registry(
+            extra_formats=extra_formats
+        )
+        self._initialize(
+            client,
+            format_registry=format_registry,
+            selection_format=selection_format,
+            page_format=page_format,
+        )
 
     async def send(
         self,
@@ -262,7 +302,10 @@ class AsyncHistoryClient:
 
     async def receive(self, handle: RequestHandle) -> MessageHistoryPage:
         reply = await self._client.receive(handle)
-        return message_history_page_from_record(reply.payload)
+        page = message_history_page_from_record(
+            reply.payload, format_table=self._format_registry
+        )
+        return page
 
     async def select(
         self,
@@ -293,6 +336,41 @@ class AsyncHistoryClient:
     @property
     def reply_format(self) -> PortableFormat[Any, Any]:
         return self._page_format
+
+    def _initialize(
+        self,
+        client: AsyncRequestClient,
+        *,
+        format_registry: PortableFormatTable,
+        selection_format: PortableFormat[Any, Any] | None,
+        page_format: PortableFormat[Any, Any] | None,
+    ) -> None:
+        if selection_format is None:
+            selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
+        if page_format is None:
+            page_format = DEFAULT_HISTORY_PAGE_FORMAT
+        self._client = client
+        self._selection_format = selection_format
+        self._page_format = page_format
+        self._format_registry = format_registry
+
+    @classmethod
+    def _from_format_registry(
+        cls,
+        client: AsyncRequestClient,
+        *,
+        format_registry: PortableFormatTable,
+        selection_format: PortableFormat[Any, Any] | None = None,
+        page_format: PortableFormat[Any, Any] | None = None,
+    ) -> "AsyncHistoryClient":
+        history_client = cls.__new__(cls)
+        history_client._initialize(
+            client,
+            format_registry=format_registry,
+            selection_format=selection_format,
+            page_format=page_format,
+        )
+        return history_client
 
 
 class AsyncHistoryService:
@@ -408,7 +486,9 @@ def message_history_page_record(page: MessageHistoryPage) -> CompositeRecord:
     return record
 
 
-def message_history_page_from_record(value: Any) -> MessageHistoryPage:
+def message_history_page_from_record(
+    value: Any, *, format_table: PortableFormatTable
+) -> MessageHistoryPage:
     record = _record_from(value, HISTORY_PAGE_RECORD_TYPE)
     values = record.get("entries")
     if not isinstance(values, list):
@@ -418,7 +498,9 @@ def message_history_page_from_record(value: Any) -> MessageHistoryPage:
 
     entries = []
     for entry_value in values:
-        entry = message_history_entry_from_record(entry_value)
+        entry = message_history_entry_from_record(
+            entry_value, format_table=format_table
+        )
         entries.append(entry)
 
     page = MessageHistoryPage(
@@ -433,7 +515,8 @@ def message_history_entry_record(
 ) -> CompositeRecord:
     record: CompositeRecord = {
         "record_type": HISTORY_ENTRY_RECORD_TYPE,
-        "payload": _portable_value(entry.payload),
+        "payload_format": entry.payload_format_key.registration_key,
+        "payload_bytes": entry.payload_bytes,
         "msg_topic": entry.msg_topic,
         "msg_type": entry.msg_type,
         "msg_producer": entry.msg_producer,
@@ -448,8 +531,26 @@ def message_history_entry_record(
     return record
 
 
-def message_history_entry_from_record(value: Any) -> MessageHistoryEntry:
+def message_history_entry_from_record(
+    value: Any, *, format_table: PortableFormatTable
+) -> MessageHistoryEntry:
     record = _record_from(value, HISTORY_ENTRY_RECORD_TYPE)
+    payload_format_value = _required_str(record, "payload_format")
+    try:
+        payload_format_key = PortableFormatKey.from_registration_key(
+            payload_format_value
+        )
+    except ValueError as e:
+        raise InvalidMessageHistoryRecordError(
+            "history payload format registration key is invalid: "
+            f"{payload_format_value!r}"
+        ) from e
+
+    payload_bytes = _required_bytes(record, "payload_bytes")
+    payload = decode_history_payload(
+        format_table, payload_format_key, payload_bytes
+    )
+
     operation_value = _required_str(record, "bus_operation")
     try:
         bus_operation = BusOperation(operation_value)
@@ -459,7 +560,9 @@ def message_history_entry_from_record(value: Any) -> MessageHistoryEntry:
         ) from e
 
     entry = MessageHistoryEntry(
-        payload=_portable_value(record.get("payload")),
+        payload=payload,
+        payload_format_key=payload_format_key,
+        payload_bytes=payload_bytes,
         msg_topic=_required_str(record, "msg_topic"),
         msg_type=_required_str(record, "msg_type"),
         msg_producer=_required_str(record, "msg_producer"),
@@ -499,6 +602,15 @@ def _required_str(record: CompositeRecord, key: str) -> str:
     if not isinstance(value, str):
         raise InvalidMessageHistoryRecordError(
             f"history field {key!r} must be a string"
+        )
+    return value
+
+
+def _required_bytes(record: CompositeRecord, key: str) -> bytes:
+    value = record.get(key)
+    if type(value) is not bytes:
+        raise InvalidMessageHistoryRecordError(
+            f"history field {key!r} must be bytes"
         )
     return value
 
@@ -559,27 +671,3 @@ def _optional_typed_int(value: int | None) -> int | None:
     if value is not None:
         result = int(value)
     return result
-
-
-def _portable_value(value: Any) -> CompositeValue:
-    if value is None:
-        return None
-    if type(value) in (bytes, str, int, float, bool):
-        return value
-    if isinstance(value, list):
-        result = []
-        for item in value:
-            result.append(_portable_value(item))
-        return result
-    if isinstance(value, dict):
-        result = {}
-        for key, item in value.items():
-            if not isinstance(key, str):
-                raise UnsupportedHistoryPayloadError(
-                    "history payload record keys must be strings"
-                )
-            result[key] = _portable_value(item)
-        return result
-    raise UnsupportedHistoryPayloadError(
-        "history payload is not JSON-compatible: " + repr(value)
-    )

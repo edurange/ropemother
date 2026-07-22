@@ -12,7 +12,7 @@ from ropemother.format.portableformat import PortableFormat, PortableFormatKey
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T06:45:19+00:00"
+__date__ = "2026-07-22T16:04:47+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -37,7 +37,5 @@ class PortableFormatTable(ABC):
     """Lookup table for portable payload formats by durable key."""
 
     @abstractmethod
-    def from_key(
-        self, key: PortableFormatKey
-    ) -> PortableFormat[Any, Any]:
+    def from_key(self, key: PortableFormatKey) -> PortableFormat[Any, Any]:
         ...

@@ -29,6 +29,7 @@ from ropemother.client.asyncrequest import (
 from ropemother.client.procedure import PROCEDURE_INVOCATION_JSON_FORMAT
 from ropemother.client.lifecycle import AsyncLifecyclePublisher
 from ropemother.client.request import RequestClientLimits
+from ropemother.format.formattable import PortableFormatTable
 from ropemother.format.portableformat import (
     COMPOSITE_PORTABLE_FORMAT,
     JSON_PORTABLE_FORMAT,
@@ -43,7 +44,7 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:28:43+00:00"
+__date__ = "2026-07-22T16:14:00+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -74,6 +75,10 @@ class AsyncEndpointProvisioner(ABC):
         msg_producer: OptionalSymbolInput = None,
         msg_type: OptionalSymbolInput = None,
     ) -> AsyncReceiver:
+        ...
+
+    @abstractmethod
+    def _portable_format_table(self) -> PortableFormatTable:
         ...
 
     async def create_lifecycle_publisher(
@@ -229,8 +234,10 @@ class AsyncEndpointProvisioner(ABC):
             request_limits=request_limits,
             request_type_formats=request_type_formats,
         )
-        history_client = AsyncHistoryClient(
+        format_table = self._portable_format_table()
+        history_client = AsyncHistoryClient._from_format_registry(
             request_client,
+            format_registry=format_table,
             selection_format=request_payload_format,
             page_format=reply_payload_format,
         )
@@ -360,3 +367,6 @@ class ImmediateAsyncEndpointProvisioner(AsyncEndpointProvisioner):
             msg_topic=msg_topic, msg_producer=msg_producer, msg_type=msg_type
         )
         return receiver
+
+    def _portable_format_table(self) -> PortableFormatTable:
+        return self._factory._portable_format_table()

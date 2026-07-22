@@ -31,7 +31,7 @@ from ropemother.format.portableformat import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T03:25:28+00:00"
+__date__ = "2026-07-22T16:05:23+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev3"
 __status__ = "Development"
@@ -103,8 +103,10 @@ class MessageEndpointFactory(
         selection_format: PortableFormat[Any, Any],
         page_format: PortableFormat[Any, Any],
     ) -> HistoryClient:
-        history_client = HistoryClient(
+        format_table = self._portable_format_table()
+        history_client = HistoryClient._from_format_registry(
             request_client,
+            format_registry=format_table,
             selection_format=selection_format,
             page_format=page_format,
         )
