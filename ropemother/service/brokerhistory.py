@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ropemother/service/brokerhistory.py
 
-"""Built-in broker history support for the freestanding service helper."""
+"""Built-in message history service profile."""
 
 from threading import Event, Thread
 from time import sleep
@@ -22,7 +22,7 @@ from ropemother.service.brokerextension import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T04:27:23+00:00"
+__date__ = "2026-08-10T23:29:33+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -113,22 +113,37 @@ class BrokerHistoryExtension(BrokerExtension):
         self._history = history
 
     def create_runner(
-        self,
-        bus: MessageEndpointFactory,
-        *,
-        daemon: bool,
+        self, bus: MessageEndpointFactory, *, daemon: bool
     ) -> BrokerExtensionRunner:
-        history_service = bus.create_history_service(
-            history=self._history,
-            request_topic=BROKER_HISTORY_REQUEST_TOPIC,
-            reply_topic=BROKER_HISTORY_REPLY_TOPIC,
-            requester_producer=BROKER_HISTORY_REQUESTER_PRODUCER,
-            responder_producer=BROKER_HISTORY_RESPONDER_PRODUCER,
-            request_msg_type=BROKER_HISTORY_REQUEST_TYPE,
-            reply_msg_type=BROKER_HISTORY_REPLY_TYPE,
-            reply_payload_format=DEFAULT_HISTORY_PAGE_FORMAT,
-        )
-        return BrokerHistoryRunner(history_service, daemon=daemon)
+        return preconfigured_history_runner(bus, self._history, daemon=daemon)
+
+
+def preconfigured_history_service(
+    bus: MessageEndpointFactory, history: MessageHistory
+) -> HistoryService:
+    """Return a service for the built-in history profile."""
+    service = bus.create_history_service(
+        history=history,
+        request_topic=BROKER_HISTORY_REQUEST_TOPIC,
+        reply_topic=BROKER_HISTORY_REPLY_TOPIC,
+        requester_producer=BROKER_HISTORY_REQUESTER_PRODUCER,
+        responder_producer=BROKER_HISTORY_RESPONDER_PRODUCER,
+        request_msg_type=BROKER_HISTORY_REQUEST_TYPE,
+        reply_msg_type=BROKER_HISTORY_REPLY_TYPE,
+        reply_payload_format=DEFAULT_HISTORY_PAGE_FORMAT,
+    )
+    return service
+
+
+def preconfigured_history_runner(
+    bus: MessageEndpointFactory,
+    history: MessageHistory,
+    *,
+    daemon: bool = True,
+) -> BrokerHistoryRunner:
+    """Return a runner for the built-in history profile."""
+    service = preconfigured_history_service(bus, history)
+    return BrokerHistoryRunner(service, daemon=daemon)
 
 
 def preconfigured_history_client(bus: MessageEndpointFactory) -> HistoryClient:

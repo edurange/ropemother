@@ -8,7 +8,7 @@ from typing import Any
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:41:46+00:00"
+__date__ = "2026-08-10T23:31:14+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -37,6 +37,8 @@ _EXPORTS = {
     "connect_client_from_bus_contact": "ropemother.service.environment",
     "connect_message_bus": "ropemother.service.environment",
     "preconfigured_history_client": "ropemother.service.brokerhistory",
+    "preconfigured_history_runner": "ropemother.service.brokerhistory",
+    "preconfigured_history_service": "ropemother.service.brokerhistory",
     "serve_local_message_bus": "ropemother.service.broker",
     "set_bus_contact_uri": "ropemother.service.environment",
 }
