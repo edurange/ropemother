@@ -22,7 +22,7 @@ from ropemother.service.brokerextension import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-10T23:29:33+00:00"
+__date__ = "2026-08-11T00:08:55+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -54,7 +54,7 @@ class BrokerHistoryFailedError(RuntimeError, BrokerHistoryRunnerError):
 
 
 class BrokerHistoryRunner(BrokerExtensionRunner):
-    """Thread runner for the freestanding broker history extension."""
+    """Thread runner for the built-in history service."""
     _history_service: HistoryService
     _stop_requested: Event
     _thread: Thread | None
@@ -115,7 +115,8 @@ class BrokerHistoryExtension(BrokerExtension):
     def create_runner(
         self, bus: MessageEndpointFactory, *, daemon: bool
     ) -> BrokerExtensionRunner:
-        return preconfigured_history_runner(bus, self._history, daemon=daemon)
+        service = preconfigured_history_service(bus, self._history)
+        return BrokerHistoryRunner(service, daemon=daemon)
 
 
 def preconfigured_history_service(
@@ -133,17 +134,6 @@ def preconfigured_history_service(
         reply_payload_format=DEFAULT_HISTORY_PAGE_FORMAT,
     )
     return service
-
-
-def preconfigured_history_runner(
-    bus: MessageEndpointFactory,
-    history: MessageHistory,
-    *,
-    daemon: bool = True,
-) -> BrokerHistoryRunner:
-    """Return a runner for the built-in history profile."""
-    service = preconfigured_history_service(bus, history)
-    return BrokerHistoryRunner(service, daemon=daemon)
 
 
 def preconfigured_history_client(bus: MessageEndpointFactory) -> HistoryClient:
