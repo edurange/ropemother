@@ -3,18 +3,20 @@
 
 """Freestanding local message bus broker process."""
 
-from argparse import ArgumentParser, Namespace
-from collections.abc import Sequence
-from pathlib import Path
+import argparse
+import collections.abc
+import pathlib
 import sys
-from tempfile import TemporaryDirectory
-from time import sleep
+import tempfile
+import time
+from typing import Any
 
 from ropemother.broker.directcore import CaptureMode
 from ropemother.capture.filesink import JSONLinesCaptureSink
 from ropemother.capture.filehistory import JSONLinesCaptureHistory
 from ropemother.capture.history import MessageHistory
 from ropemother.capture.sink import CaptureSink
+from ropemother.format.portableformat import PortableFormat
 from ropemother.service.brokerextension import BrokerExtension
 from ropemother.service.brokerhistory import BrokerHistoryExtension
 from ropemother.service.environment import BUS_CONTACT_URI_VARIABLE
@@ -25,7 +27,7 @@ from ropemother.service.host import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-10T22:42:59+00:00"
+__date__ = "2026-08-12T03:11:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -38,8 +40,9 @@ DEFAULT_CAPTURE_FILENAME = "capture.jsonl"
 
 def serve_local_message_bus(
     *,
-    runtime_directory: Path | str | None = DEFAULT_RUNTIME_DIRECTORY,
-    socket_path: Path | str | None = None,
+    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]] = (),
+    runtime_directory: pathlib.Path | str | None = DEFAULT_RUNTIME_DIRECTORY,
+    socket_path: pathlib.Path | str | None = None,
     replace_existing_socket: bool = False,
     capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
     capture_sink: CaptureSink | None = None,
@@ -47,6 +50,7 @@ def serve_local_message_bus(
 ) -> None:
     """Run a local message bus broker until interrupted."""
     with LocalMessageBusHost(
+        extra_formats=extra_formats,
         runtime_directory=runtime_directory,
         socket_path=socket_path,
         replace_existing_socket=replace_existing_socket,
@@ -64,18 +68,23 @@ def serve_local_message_bus(
         print("Press Ctrl-C to stop", flush=True)
         try:
             while True:
-                sleep(BROKER_IDLE_SLEEP_SECONDS)
+                time.sleep(BROKER_IDLE_SLEEP_SECONDS)
         except KeyboardInterrupt:
             print("Stopping message bus broker", flush=True)
 
 
-def run_local_broker_command(argv: Sequence[str] | None = None) -> int:
+def run_local_broker_command(
+    argv: collections.abc.Sequence[str] | None = None,
+    *,
+    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]] = (),
+) -> int:
     args = _parse_arguments(argv)
+    portable_formats = tuple(extra_formats)
 
     temporary_runtime = None
 
     if args.temporary:
-        temporary_runtime = TemporaryDirectory(prefix="ropemother-")
+        temporary_runtime = tempfile.TemporaryDirectory(prefix="ropemother-")
         runtime_directory = temporary_runtime.name
     else:
         runtime_directory = _runtime_directory_from_arguments(args)
@@ -83,10 +92,13 @@ def run_local_broker_command(argv: Sequence[str] | None = None) -> int:
     capture_path = _capture_path_from_arguments(args, runtime_directory)
     capture_mode = _capture_mode_from_arguments(args)
     capture_sink = _capture_sink_from_arguments(args, capture_path)
-    broker_extensions = _broker_extensions_from_arguments(args, capture_path)
+    broker_extensions = _broker_extensions_from_arguments(
+        args, capture_path, extra_formats=portable_formats
+    )
 
     try:
         serve_local_message_bus(
+            extra_formats=portable_formats,
             runtime_directory=runtime_directory,
             socket_path=args.socket_path,
             replace_existing_socket=args.replace_existing_socket,
@@ -101,7 +113,9 @@ def run_local_broker_command(argv: Sequence[str] | None = None) -> int:
     return 0
 
 
-def _runtime_directory_from_arguments(args: Namespace) -> Path | str | None:
+def _runtime_directory_from_arguments(
+    args: argparse.Namespace
+) -> pathlib.Path | str | None:
     runtime_directory = args.runtime_directory
     if runtime_directory is None and args.socket_path is None:
         runtime_directory = DEFAULT_RUNTIME_DIRECTORY
@@ -109,8 +123,10 @@ def _runtime_directory_from_arguments(args: Namespace) -> Path | str | None:
     return runtime_directory
 
 
-def _parse_arguments(argv: Sequence[str] | None) -> Namespace:
-    parser = ArgumentParser(
+def _parse_arguments(
+    argv: collections.abc.Sequence[str] | None
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
         description="Run a freestanding local message bus broker."
     )
     location_group = parser.add_mutually_exclusive_group()
@@ -167,7 +183,7 @@ def _parse_arguments(argv: Sequence[str] | None) -> Namespace:
 
 
 def _capture_sink_from_arguments(
-    args: Namespace, capture_path: Path | None
+    args: argparse.Namespace, capture_path: pathlib.Path | None
 ) -> CaptureSink | None:
     if capture_path is None:
         return None
@@ -176,7 +192,7 @@ def _capture_sink_from_arguments(
     return JSONLinesCaptureSink(capture_path, append=not args.replace_capture)
 
 
-def _capture_mode_from_arguments(args: Namespace) -> CaptureMode:
+def _capture_mode_from_arguments(args: argparse.Namespace) -> CaptureMode:
     if args.transport_only:
         return CaptureMode.TRANSPORT_ONLY
 
@@ -184,27 +200,34 @@ def _capture_mode_from_arguments(args: Namespace) -> CaptureMode:
 
 
 def _capture_path_from_arguments(
-    args: Namespace, runtime_directory: Path | str | None
-) -> Path | None:
+    args: argparse.Namespace, runtime_directory: pathlib.Path | str | None
+) -> pathlib.Path | None:
     if args.transport_only:
         return None
 
     if args.capture_path is not None:
-        return Path(args.capture_path).expanduser()
+        return pathlib.Path(args.capture_path).expanduser()
 
     if runtime_directory is None:
-        capture_path = Path(DEFAULT_CAPTURE_FILENAME)
+        capture_path = pathlib.Path(DEFAULT_CAPTURE_FILENAME)
     else:
-        capture_path = Path(runtime_directory) / DEFAULT_CAPTURE_FILENAME
+        capture_path = (
+            pathlib.Path(runtime_directory) / DEFAULT_CAPTURE_FILENAME
+        )
 
     return capture_path.expanduser()
 
 
 def _broker_extensions_from_arguments(
-    args: Namespace, capture_path: Path | None
+    args: argparse.Namespace,
+    capture_path: pathlib.Path | None,
+    *,
+    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]],
 ) -> list[BrokerExtension]:
     broker_extensions = []
-    history = _history_from_arguments(args, capture_path)
+    history = _history_from_arguments(
+        args, capture_path, extra_formats=extra_formats
+    )
     if history is not None:
         broker_extensions.append(BrokerHistoryExtension(history))
 
@@ -212,7 +235,10 @@ def _broker_extensions_from_arguments(
 
 
 def _history_from_arguments(
-    args: Namespace, capture_path: Path | None
+    args: argparse.Namespace,
+    capture_path: pathlib.Path | None,
+    *,
+    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]],
 ) -> MessageHistory | None:
     if not args.history:
         return None
@@ -224,7 +250,7 @@ def _history_from_arguments(
 
     capture_path.parent.mkdir(parents=True, exist_ok=True)
     capture_path.touch(exist_ok=True)
-    return JSONLinesCaptureHistory(capture_path)
+    return JSONLinesCaptureHistory(capture_path, extra_formats=extra_formats)
 
 
 if __name__ == "__main__":
