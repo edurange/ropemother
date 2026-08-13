@@ -13,6 +13,7 @@ from ropemother.capture.history import (
 )
 from ropemother.capture.historyselection import (
     DEFAULT_HISTORY_MAX_COUNT,
+    HistoryCursor,
     HistorySelection,
     HistorySequenceOrder,
     history_selection_from_args,
@@ -101,8 +102,7 @@ class HistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> RequestHandle:
         selection = history_selection_from_args(
@@ -111,8 +111,7 @@ class HistoryClient:
             msg_producer=msg_producer,
             bus_operation=bus_operation,
             sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
+            cursor=cursor,
             max_count=max_count,
         )
         request_payload = message_history_selection_record(selection)
@@ -136,8 +135,7 @@ class HistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> MessageHistoryPage:
         handle = self.send(
@@ -146,8 +144,7 @@ class HistoryClient:
             msg_producer=msg_producer,
             bus_operation=bus_operation,
             sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
+            cursor=cursor,
             max_count=max_count,
         )
         return self.receive(handle)
@@ -160,13 +157,11 @@ class HistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> tuple[MessageHistoryEntry, ...]:
         entries = []
-        page_start_sequence = start_sequence
-        page_stop_sequence = stop_sequence
+        page_cursor = cursor
 
         while True:
             page = self.select(
@@ -175,19 +170,15 @@ class HistoryClient:
                 msg_producer=msg_producer,
                 bus_operation=bus_operation,
                 sequence_order=sequence_order,
-                start_sequence=page_start_sequence,
-                stop_sequence=page_stop_sequence,
+                cursor=page_cursor,
                 max_count=max_count,
             )
             entries.extend(page.entries)
 
-            if page.next_sequence is None:
+            if page.next_cursor is None:
                 break
 
-            if sequence_order == HistorySequenceOrder.DESCENDING:
-                page_stop_sequence = page.next_sequence
-            else:
-                page_start_sequence = page.next_sequence
+            page_cursor = page.next_cursor
 
         return tuple(entries)
 
@@ -286,8 +277,7 @@ class HistoryService:
             msg_producer=selection.msg_producer,
             bus_operation=selection.bus_operation,
             sequence_order=selection.sequence_order,
-            start_sequence=selection.start_sequence,
-            stop_sequence=selection.stop_sequence,
+            cursor=selection.cursor,
             max_count=selection.max_count,
         )
         reply_payload = message_history_page_record(page)
@@ -327,8 +317,7 @@ class AsyncHistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> RequestHandle:
         selection = history_selection_from_args(
@@ -337,8 +326,7 @@ class AsyncHistoryClient:
             msg_producer=msg_producer,
             bus_operation=bus_operation,
             sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
+            cursor=cursor,
             max_count=max_count,
         )
         request_payload = message_history_selection_record(selection)
@@ -362,8 +350,7 @@ class AsyncHistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> MessageHistoryPage:
         handle = await self.send(
@@ -372,8 +359,7 @@ class AsyncHistoryClient:
             msg_producer=msg_producer,
             bus_operation=bus_operation,
             sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
+            cursor=cursor,
             max_count=max_count,
         )
         return await self.receive(handle)
@@ -386,13 +372,11 @@ class AsyncHistoryClient:
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> tuple[MessageHistoryEntry, ...]:
         entries = []
-        page_start_sequence = start_sequence
-        page_stop_sequence = stop_sequence
+        page_cursor = cursor
 
         while True:
             page = await self.select(
@@ -401,19 +385,15 @@ class AsyncHistoryClient:
                 msg_producer=msg_producer,
                 bus_operation=bus_operation,
                 sequence_order=sequence_order,
-                start_sequence=page_start_sequence,
-                stop_sequence=page_stop_sequence,
+                cursor=page_cursor,
                 max_count=max_count,
             )
             entries.extend(page.entries)
 
-            if page.next_sequence is None:
+            if page.next_cursor is None:
                 break
 
-            if sequence_order == HistorySequenceOrder.DESCENDING:
-                page_stop_sequence = page.next_sequence
-            else:
-                page_start_sequence = page.next_sequence
+            page_cursor = page.next_cursor
 
         return tuple(entries)
 
@@ -512,8 +492,7 @@ class AsyncHistoryService:
             msg_producer=selection.msg_producer,
             bus_operation=selection.bus_operation,
             sequence_order=selection.sequence_order,
-            start_sequence=selection.start_sequence,
-            stop_sequence=selection.stop_sequence,
+            cursor=selection.cursor,
             max_count=selection.max_count,
         )
         reply_payload = message_history_page_record(page)
@@ -526,6 +505,9 @@ def message_history_selection_record(
     bus_operation = None
     if selection.bus_operation is not None:
         bus_operation = selection.bus_operation.value
+    cursor = None
+    if selection.cursor is not None:
+        cursor = selection.cursor.value
     record: CompositeRecord = {
         "record_type": HISTORY_SELECTION_RECORD_TYPE,
         "msg_topic": selection.msg_topic,
@@ -533,8 +515,7 @@ def message_history_selection_record(
         "msg_producer": selection.msg_producer,
         "bus_operation": bus_operation,
         "sequence_order": selection.sequence_order.value,
-        "start_sequence": selection.start_sequence,
-        "stop_sequence": selection.stop_sequence,
+        "cursor": cursor,
         "max_count": selection.max_count,
     }
     return record
@@ -565,14 +546,18 @@ def message_history_selection_from_record(value: Any) -> HistorySelection:
             f"unknown history sequence order: {sequence_order_value!r}"
         )
 
+    cursor_value = _optional_str(record, "cursor")
+    cursor = None
+    if cursor_value is not None:
+        cursor = HistoryCursor(cursor_value)
+
     selection = history_selection_from_args(
         msg_topic=_optional_str(record, "msg_topic"),
         msg_type=_optional_str(record, "msg_type"),
         msg_producer=_optional_str(record, "msg_producer"),
         bus_operation=bus_operation,
         sequence_order=sequence_order,
-        start_sequence=_optional_int(record, "start_sequence"),
-        stop_sequence=_optional_int(record, "stop_sequence"),
+        cursor=cursor,
         max_count=_required_int(record, "max_count"),
     )
     return selection
@@ -582,10 +567,13 @@ def message_history_page_record(page: MessageHistoryPage) -> CompositeRecord:
     entries = []
     for entry in page.entries:
         entries.append(message_history_entry_record(entry))
+    next_cursor = None
+    if page.next_cursor is not None:
+        next_cursor = page.next_cursor.value
     record: CompositeRecord = {
         "record_type": HISTORY_PAGE_RECORD_TYPE,
         "entries": entries,
-        "next_sequence": page.next_sequence,
+        "next_cursor": next_cursor,
     }
     return record
 
@@ -607,10 +595,12 @@ def message_history_page_from_record(
         )
         entries.append(entry)
 
-    page = MessageHistoryPage(
-        entries=tuple(entries),
-        next_sequence=_optional_int(record, "next_sequence"),
-    )
+    next_cursor_value = _optional_str(record, "next_cursor")
+    next_cursor = None
+    if next_cursor_value is not None:
+        next_cursor = HistoryCursor(next_cursor_value)
+
+    page = MessageHistoryPage(entries=tuple(entries), next_cursor=next_cursor)
     return page
 
 
@@ -626,8 +616,6 @@ def message_history_entry_record(
         "msg_producer": entry.msg_producer,
         "msg_id": int(entry.msg_id),
         "bus_operation": entry.bus_operation.value,
-        "bus_sequence": entry.bus_sequence,
-        "topic_sequence": entry.topic_sequence,
         "bus_received_at": entry.bus_received_at,
         "correlation_id": _optional_typed_int(entry.correlation_id),
         "reply_to": _optional_typed_int(entry.reply_to),
@@ -672,8 +660,6 @@ def message_history_entry_from_record(
         msg_producer=_required_str(record, "msg_producer"),
         msg_id=MessageID(_required_int(record, "msg_id")),
         bus_operation=bus_operation,
-        bus_sequence=_required_int(record, "bus_sequence"),
-        topic_sequence=_required_int(record, "topic_sequence"),
         bus_received_at=_required_int(record, "bus_received_at"),
         correlation_id=_optional_correlation_id(record, "correlation_id"),
         reply_to=_optional_message_id(record, "reply_to"),

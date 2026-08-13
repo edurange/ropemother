@@ -3,7 +3,7 @@
 
 """Read-side history over JSON Lines capture files."""
 
-from pathlib import Path
+import pathlib
 from typing import Any, Iterable, TextIO, cast, override
 
 from ropemother.capture.history import (
@@ -13,7 +13,10 @@ from ropemother.capture.history import (
     MessageHistoryError,
     MessageHistoryPage,
 )
-from ropemother.capture.historyselection import HistorySequenceOrder
+from ropemother.capture.historyselection import (
+    HistoryCursor,
+    HistorySequenceOrder,
+)
 from ropemother.capture.jsonrecords import capture_record_from_record
 from ropemother.capture.writer import CaptureRecord, CaptureRecordSource
 from ropemother.format.portableformat import PortableFormat
@@ -38,21 +41,67 @@ class MessageHistoryFormatError(ValueError, MessageHistoryError):
     pass
 
 
+class JSONLinesCaptureHistory(MessageHistory):
+    """Message history view backed by a JSON Lines capture file."""
+    _source: "_JSONLinesCaptureRecordSource"
+    _history: InMemoryCaptureHistory
+
+    def __init__(
+        self,
+        path: str | pathlib.Path,
+        *,
+        encoding: str = "utf-8",
+        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+    ) -> None:
+        source_path = pathlib.Path(path)
+        self._source = _JSONLinesCaptureRecordSource(source_path, encoding)
+        self._history = InMemoryCaptureHistory(
+            self._source, extra_formats=extra_formats
+        )
+
+    @property
+    def path(self) -> pathlib.Path:
+        return self._source.path
+
+    @override
+    def select(
+        self,
+        *,
+        msg_topic: str | None = None,
+        msg_type: str | None = None,
+        msg_producer: str | None = None,
+        bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
+        cursor: HistoryCursor | None = None,
+        max_count: int = DEFAULT_HISTORY_MAX_COUNT,
+    ) -> MessageHistoryPage:
+        page = self._history.select(
+            msg_topic=msg_topic,
+            msg_type=msg_type,
+            msg_producer=msg_producer,
+            bus_operation=bus_operation,
+            sequence_order=sequence_order,
+            cursor=cursor,
+            max_count=max_count,
+        )
+        return page
+
+
 class _JSONLinesCaptureRecordSource(CaptureRecordSource):
     """Persistent indexed source backed by a JSON Lines capture file."""
-    _path: Path
+    _path: pathlib.Path
     _encoding: str
     _record_offsets: list[int]
     _indexed_position: int
 
-    def __init__(self, path: Path, encoding: str) -> None:
+    def __init__(self, path: pathlib.Path, encoding: str) -> None:
         self._path = path
         self._encoding = encoding
         self._record_offsets = []
         self._indexed_position = 0
 
     @property
-    def path(self) -> Path:
+    def path(self) -> pathlib.Path:
         return self._path
 
     @property
@@ -188,50 +237,3 @@ class _JSONLinesCaptureRecordSource(CaptureRecordSource):
                 )
 
         return cast(JSONRecord, value)
-
-
-class JSONLinesCaptureHistory(MessageHistory):
-    """Message history view backed by a JSON Lines capture file."""
-    _source: _JSONLinesCaptureRecordSource
-    _history: InMemoryCaptureHistory
-
-    def __init__(
-        self,
-        path: str | Path,
-        *,
-        encoding: str = "utf-8",
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-    ) -> None:
-        self._source = _JSONLinesCaptureRecordSource(Path(path), encoding)
-        self._history = InMemoryCaptureHistory(
-            self._source, extra_formats=extra_formats
-        )
-
-    @property
-    def path(self) -> Path:
-        return self._source.path
-
-    @override
-    def select(
-        self,
-        *,
-        msg_topic: str | None = None,
-        msg_type: str | None = None,
-        msg_producer: str | None = None,
-        bus_operation: BusOperation | None = None,
-        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
-        max_count: int = DEFAULT_HISTORY_MAX_COUNT,
-    ) -> MessageHistoryPage:
-        page = self._history.select(
-            msg_topic=msg_topic,
-            msg_type=msg_type,
-            msg_producer=msg_producer,
-            bus_operation=bus_operation,
-            sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
-            max_count=max_count,
-        )
-        return page

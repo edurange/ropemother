@@ -11,13 +11,18 @@ from ropemother.util.symbol import Symbol
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T15:55:18+00:00"
+__date__ = "2026-08-13T20:25:47+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev5"
 __status__ = "Development"
 
 
 DEFAULT_HISTORY_MAX_COUNT = 100
+
+
+class HistoryCursor(Symbol):
+    """Opaque continuation token for a message history selection."""
+    pass
 
 
 class HistorySequenceOrder(Symbol):
@@ -38,8 +43,7 @@ class HistorySelection:
     msg_producer: str | None = None
     bus_operation: BusOperation | None = None
     sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING
-    start_sequence: int | None = None
-    stop_sequence: int | None = None
+    cursor: HistoryCursor | None = None
     max_count: int = DEFAULT_HISTORY_MAX_COUNT
 
 
@@ -50,8 +54,7 @@ def history_selection_from_args(
     msg_producer: str | None = None,
     bus_operation: BusOperation | None = None,
     sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-    start_sequence: int | None = None,
-    stop_sequence: int | None = None,
+    cursor: HistoryCursor | None = None,
     max_count: int = DEFAULT_HISTORY_MAX_COUNT,
 ) -> HistorySelection:
     selection = HistorySelection(
@@ -60,8 +63,7 @@ def history_selection_from_args(
         msg_producer=msg_producer,
         bus_operation=bus_operation,
         sequence_order=sequence_order,
-        start_sequence=start_sequence,
-        stop_sequence=stop_sequence,
+        cursor=cursor,
         max_count=max_count,
     )
     return selection

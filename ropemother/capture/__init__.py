@@ -18,6 +18,7 @@ _EXPORTS = {
     "AsyncHistoryClient": "ropemother.capture.historyservice",
     "AsyncHistoryService": "ropemother.capture.historyservice",
     "HistoryClient": "ropemother.capture.historyservice",
+    "HistoryCursor": "ropemother.capture.historyselection",
     "HistoryService": "ropemother.capture.historyservice",
     "HistorySequenceOrder": "ropemother.capture.historyselection",
     "InMemoryCaptureHistory": "ropemother.capture.history",

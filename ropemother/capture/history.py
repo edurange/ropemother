@@ -3,12 +3,13 @@
 
 """Read-side history views over captured message records."""
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass
+import abc
+import dataclasses
 from typing import Any, Iterable, override
 
 from ropemother.capture.historyselection import (
     DEFAULT_HISTORY_MAX_COUNT,
+    HistoryCursor,
     HistorySelection,
     HistorySequenceOrder,
     history_selection_from_args,
@@ -32,7 +33,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T18:23:53+00:00"
+__date__ = "2026-08-13T20:27:52+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev5"
 __status__ = "Development"
@@ -58,7 +59,7 @@ class MessageHistoryPayloadDecodeError(ValueError, MessageHistoryError):
     pass
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MessageHistoryEntry:
     """Decoded captured message returned from a history query."""
     payload: Any
@@ -69,24 +70,22 @@ class MessageHistoryEntry:
     msg_producer: str
     msg_id: MessageID
     bus_operation: BusOperation
-    bus_sequence: int
-    topic_sequence: int
     bus_received_at: int
     correlation_id: CorrelationID | None = None
     reply_to: MessageID | None = None
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class MessageHistoryPage:
-    """Page of decoded history entries and the next sequence cursor."""
+    """Page of decoded history entries and an optional continuation cursor."""
     entries: tuple[MessageHistoryEntry, ...]
-    next_sequence: int | None = None
+    next_cursor: HistoryCursor | None = None
 
 
-class MessageHistory(ABC):
+class MessageHistory(abc.ABC):
     """Read-side interface for querying captured message history."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def select(
         self,
         *,
@@ -95,8 +94,7 @@ class MessageHistory(ABC):
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> MessageHistoryPage:
         ...
@@ -140,8 +138,7 @@ class InMemoryCaptureHistory(MessageHistory):
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
         sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
-        start_sequence: int | None = None,
-        stop_sequence: int | None = None,
+        cursor: HistoryCursor | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
     ) -> MessageHistoryPage:
         selection = history_selection_from_args(
@@ -150,11 +147,11 @@ class InMemoryCaptureHistory(MessageHistory):
             msg_producer=msg_producer,
             bus_operation=bus_operation,
             sequence_order=sequence_order,
-            start_sequence=start_sequence,
-            stop_sequence=stop_sequence,
+            cursor=cursor,
             max_count=max_count,
         )
         _validate_selection(selection)
+        cursor_sequence = _bus_sequence_from_cursor(selection.cursor)
 
         self._refresh_registrations()
 
@@ -167,7 +164,8 @@ class InMemoryCaptureHistory(MessageHistory):
             return MessageHistoryPage(entries=())
 
         entries: list[MessageHistoryEntry] = []
-        next_sequence = None
+        last_cursor = None
+        next_cursor = None
         record_count = self._indexed_record_count
         records = self._source.read_capture_records(0, record_count)
         if len(records) != record_count:
@@ -189,21 +187,20 @@ class InMemoryCaptureHistory(MessageHistory):
             if not _message_matches(
                 record,
                 selection=selection,
+                cursor_sequence=cursor_sequence,
                 topic_id=topic_id,
                 msg_type_id=msg_type_id,
                 producer_id=producer_id,
             ):
                 continue
             if len(entries) >= selection.max_count:
-                if descending:
-                    next_sequence = entries[-1].bus_sequence
-                else:
-                    next_sequence = record.bus_sequence
+                next_cursor = last_cursor
                 break
             entries.append(self._entry_for(record))
+            last_cursor = _cursor_for_bus_sequence(record.bus_sequence)
 
         page = MessageHistoryPage(
-            entries=tuple(entries), next_sequence=next_sequence
+            entries=tuple(entries), next_cursor=next_cursor
         )
         return page
 
@@ -296,8 +293,6 @@ class InMemoryCaptureHistory(MessageHistory):
             msg_producer=msg_producer,
             msg_id=message.msg_id,
             bus_operation=message.bus_operation,
-            bus_sequence=message.bus_sequence,
-            topic_sequence=message.topic_sequence,
             bus_received_at=message.bus_received_at,
             correlation_id=message.correlation_id,
             reply_to=message.reply_to,
@@ -340,14 +335,24 @@ def _validate_selection(selection: HistorySelection) -> None:
         raise InvalidHistorySelectionError(
             f"max_count must be positive: got {selection.max_count}"
         )
-    if selection.start_sequence is not None and selection.start_sequence < 0:
-        raise InvalidHistorySelectionError(
-            f"start_sequence must be non-negative: {selection.start_sequence}"
-        )
-    if selection.stop_sequence is not None and selection.stop_sequence < 0:
-        raise InvalidHistorySelectionError(
-            f"stop_sequence must be non-negative: {selection.stop_sequence}"
-        )
+
+
+def _cursor_for_bus_sequence(bus_sequence: int) -> HistoryCursor:
+    return HistoryCursor(str(bus_sequence))
+
+
+def _bus_sequence_from_cursor(cursor: HistoryCursor | None) -> int | None:
+    if cursor is None:
+        return None
+
+    try:
+        bus_sequence = int(cursor.value)
+    except ValueError as e:
+        raise InvalidHistorySelectionError("invalid history cursor") from e
+
+    if bus_sequence < 0:
+        raise InvalidHistorySelectionError("invalid history cursor")
+    return bus_sequence
 
 
 def _missing_requested_symbol(
@@ -371,14 +376,16 @@ def _message_matches(
     topic_id: TopicID | None,
     msg_type_id: MessageTypeID | None,
     producer_id: ProducerID | None,
+    cursor_sequence: int | None,
 ) -> bool:
     result = True
     if selection.bus_operation is not None:
         result = result and message.bus_operation is selection.bus_operation
-    if selection.start_sequence is not None:
-        result = result and message.bus_sequence >= selection.start_sequence
-    if selection.stop_sequence is not None:
-        result = result and message.bus_sequence < selection.stop_sequence
+    if cursor_sequence is not None:
+        if selection.sequence_order == HistorySequenceOrder.DESCENDING:
+            result = result and message.bus_sequence < cursor_sequence
+        else:
+            result = result and message.bus_sequence > cursor_sequence
     if topic_id is not None:
         result = result and message.msg_topic_id == topic_id
     if msg_type_id is not None:

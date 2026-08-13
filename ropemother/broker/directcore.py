@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-10T22:22:45+00:00"
+__date__ = "2026-08-13T20:30:24+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev5"
 __status__ = "Development"
@@ -180,6 +180,9 @@ class DirectBrokerCore:
         )
         self._symbol_registry = MessageSymbolRegistry()
         self._registrations = []
+        # Local sequence counters support broker and capture bookkeeping. Their
+        # values are implementation details, not part of the public message or
+        # history interface.
         self._bus_sequence = 0
         self._topic_sequences = {}
         self._receivers = []
