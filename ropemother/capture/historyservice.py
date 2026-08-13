@@ -14,6 +14,7 @@ from ropemother.capture.history import (
 from ropemother.capture.historyselection import (
     DEFAULT_HISTORY_MAX_COUNT,
     HistorySelection,
+    HistorySequenceOrder,
     history_selection_from_args,
 )
 from ropemother.client.asyncrequest import (
@@ -42,7 +43,7 @@ from ropemother.util.compositeblobserializer import CompositeRecord
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T15:45:35+00:00"
+__date__ = "2026-08-13T18:46:20+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -99,6 +100,7 @@ class HistoryClient:
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -108,6 +110,7 @@ class HistoryClient:
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,
@@ -132,6 +135,7 @@ class HistoryClient:
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -141,11 +145,51 @@ class HistoryClient:
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,
         )
         return self.receive(handle)
+
+    def select_all(
+        self,
+        *,
+        msg_topic: str | None = None,
+        msg_type: str | None = None,
+        msg_producer: str | None = None,
+        bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
+        start_sequence: int | None = None,
+        stop_sequence: int | None = None,
+        max_count: int = DEFAULT_HISTORY_MAX_COUNT,
+    ) -> tuple[MessageHistoryEntry, ...]:
+        entries = []
+        page_start_sequence = start_sequence
+        page_stop_sequence = stop_sequence
+
+        while True:
+            page = self.select(
+                msg_topic=msg_topic,
+                msg_type=msg_type,
+                msg_producer=msg_producer,
+                bus_operation=bus_operation,
+                sequence_order=sequence_order,
+                start_sequence=page_start_sequence,
+                stop_sequence=page_stop_sequence,
+                max_count=max_count,
+            )
+            entries.extend(page.entries)
+
+            if page.next_sequence is None:
+                break
+
+            if sequence_order == HistorySequenceOrder.DESCENDING:
+                page_stop_sequence = page.next_sequence
+            else:
+                page_start_sequence = page.next_sequence
+
+        return tuple(entries)
 
     @property
     def request_format(self) -> PortableFormat[Any, Any]:
@@ -241,6 +285,7 @@ class HistoryService:
             msg_type=selection.msg_type,
             msg_producer=selection.msg_producer,
             bus_operation=selection.bus_operation,
+            sequence_order=selection.sequence_order,
             start_sequence=selection.start_sequence,
             stop_sequence=selection.stop_sequence,
             max_count=selection.max_count,
@@ -281,6 +326,7 @@ class AsyncHistoryClient:
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -290,6 +336,7 @@ class AsyncHistoryClient:
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,
@@ -314,6 +361,7 @@ class AsyncHistoryClient:
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -323,11 +371,51 @@ class AsyncHistoryClient:
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,
         )
         return await self.receive(handle)
+
+    async def select_all(
+        self,
+        *,
+        msg_topic: str | None = None,
+        msg_type: str | None = None,
+        msg_producer: str | None = None,
+        bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
+        start_sequence: int | None = None,
+        stop_sequence: int | None = None,
+        max_count: int = DEFAULT_HISTORY_MAX_COUNT,
+    ) -> tuple[MessageHistoryEntry, ...]:
+        entries = []
+        page_start_sequence = start_sequence
+        page_stop_sequence = stop_sequence
+
+        while True:
+            page = await self.select(
+                msg_topic=msg_topic,
+                msg_type=msg_type,
+                msg_producer=msg_producer,
+                bus_operation=bus_operation,
+                sequence_order=sequence_order,
+                start_sequence=page_start_sequence,
+                stop_sequence=page_stop_sequence,
+                max_count=max_count,
+            )
+            entries.extend(page.entries)
+
+            if page.next_sequence is None:
+                break
+
+            if sequence_order == HistorySequenceOrder.DESCENDING:
+                page_stop_sequence = page.next_sequence
+            else:
+                page_start_sequence = page.next_sequence
+
+        return tuple(entries)
 
     @property
     def request_format(self) -> PortableFormat[Any, Any]:
@@ -423,6 +511,7 @@ class AsyncHistoryService:
             msg_type=selection.msg_type,
             msg_producer=selection.msg_producer,
             bus_operation=selection.bus_operation,
+            sequence_order=selection.sequence_order,
             start_sequence=selection.start_sequence,
             stop_sequence=selection.stop_sequence,
             max_count=selection.max_count,
@@ -443,6 +532,7 @@ def message_history_selection_record(
         "msg_type": selection.msg_type,
         "msg_producer": selection.msg_producer,
         "bus_operation": bus_operation,
+        "sequence_order": selection.sequence_order.value,
         "start_sequence": selection.start_sequence,
         "stop_sequence": selection.stop_sequence,
         "max_count": selection.max_count,
@@ -462,11 +552,25 @@ def message_history_selection_from_record(value: Any) -> HistorySelection:
                 f"unknown bus operation: {operation_value!r}"
             ) from e
 
+    sequence_order_value = _optional_str(record, "sequence_order")
+    sequence_order = HistorySequenceOrder.ASCENDING
+
+    if sequence_order_value == HistorySequenceOrder.DESCENDING.value:
+        sequence_order = HistorySequenceOrder.DESCENDING
+    elif (
+        sequence_order_value is not None
+        and sequence_order_value != HistorySequenceOrder.ASCENDING.value
+    ):
+        raise InvalidMessageHistoryRecordError(
+            f"unknown history sequence order: {sequence_order_value!r}"
+        )
+
     selection = history_selection_from_args(
         msg_topic=_optional_str(record, "msg_topic"),
         msg_type=_optional_str(record, "msg_type"),
         msg_producer=_optional_str(record, "msg_producer"),
         bus_operation=bus_operation,
+        sequence_order=sequence_order,
         start_sequence=_optional_int(record, "start_sequence"),
         stop_sequence=_optional_int(record, "stop_sequence"),
         max_count=_required_int(record, "max_count"),

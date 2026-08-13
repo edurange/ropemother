@@ -3,13 +3,15 @@
 
 """Shared internal selection state for message history reads."""
 
-from dataclasses import dataclass
+import dataclasses
+import typing
 
 from ropemother.message.records import BusOperation
+from ropemother.util.symbol import Symbol
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-04T03:43:03+00:00"
+__date__ = "2026-08-13T15:55:18+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -18,13 +20,24 @@ __status__ = "Development"
 DEFAULT_HISTORY_MAX_COUNT = 100
 
 
-@dataclass(frozen=True, kw_only=True)
+class HistorySequenceOrder(Symbol):
+    """Ordering direction for message history selections."""
+    ASCENDING: typing.ClassVar[typing.Final["HistorySequenceOrder"]]
+    DESCENDING: typing.ClassVar[typing.Final["HistorySequenceOrder"]]
+
+
+HistorySequenceOrder.ASCENDING = HistorySequenceOrder("ascending")
+HistorySequenceOrder.DESCENDING = HistorySequenceOrder("descending")
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class HistorySelection:
     """Filter and pagination request for captured message history."""
     msg_topic: str | None = None
     msg_type: str | None = None
     msg_producer: str | None = None
     bus_operation: BusOperation | None = None
+    sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING
     start_sequence: int | None = None
     stop_sequence: int | None = None
     max_count: int = DEFAULT_HISTORY_MAX_COUNT
@@ -36,6 +49,7 @@ def history_selection_from_args(
     msg_type: str | None = None,
     msg_producer: str | None = None,
     bus_operation: BusOperation | None = None,
+    sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
     start_sequence: int | None = None,
     stop_sequence: int | None = None,
     max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -45,6 +59,7 @@ def history_selection_from_args(
         msg_type=msg_type,
         msg_producer=msg_producer,
         bus_operation=bus_operation,
+        sequence_order=sequence_order,
         start_sequence=start_sequence,
         stop_sequence=stop_sequence,
         max_count=max_count,

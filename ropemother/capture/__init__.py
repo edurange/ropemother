@@ -8,7 +8,7 @@ from typing import Any
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T15:46:06+00:00"
+__date__ = "2026-08-13T15:55:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -19,6 +19,7 @@ _EXPORTS = {
     "AsyncHistoryService": "ropemother.capture.historyservice",
     "HistoryClient": "ropemother.capture.historyservice",
     "HistoryService": "ropemother.capture.historyservice",
+    "HistorySequenceOrder": "ropemother.capture.historyselection",
     "InMemoryCaptureHistory": "ropemother.capture.history",
     "InMemoryCaptureSink": "ropemother.capture.memorysink",
     "IncompleteMessageHistoryError": "ropemother.capture.history",

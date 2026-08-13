@@ -13,6 +13,7 @@ from ropemother.capture.history import (
     MessageHistoryError,
     MessageHistoryPage,
 )
+from ropemother.capture.historyselection import HistorySequenceOrder
 from ropemother.capture.jsonrecords import capture_record_from_record
 from ropemother.capture.writer import CaptureRecord, CaptureRecordSource
 from ropemother.format.portableformat import PortableFormat
@@ -21,7 +22,7 @@ from ropemother.util.onelinejson import JSONRecord, oneline_deserialize
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T19:57:39+00:00"
+__date__ = "2026-08-13T18:31:41+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -218,6 +219,7 @@ class JSONLinesCaptureHistory(MessageHistory):
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -227,6 +229,7 @@ class JSONLinesCaptureHistory(MessageHistory):
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,

@@ -10,6 +10,7 @@ from typing import Any, Iterable, override
 from ropemother.capture.historyselection import (
     DEFAULT_HISTORY_MAX_COUNT,
     HistorySelection,
+    HistorySequenceOrder,
     history_selection_from_args,
 )
 from ropemother.capture.writer import CaptureRecord, CaptureRecordSource
@@ -31,7 +32,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T15:23:09+00:00"
+__date__ = "2026-08-13T18:23:53+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev4"
 __status__ = "Development"
@@ -93,6 +94,7 @@ class MessageHistory(ABC):
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -137,6 +139,7 @@ class InMemoryCaptureHistory(MessageHistory):
         msg_type: str | None = None,
         msg_producer: str | None = None,
         bus_operation: BusOperation | None = None,
+        sequence_order: HistorySequenceOrder = HistorySequenceOrder.ASCENDING,
         start_sequence: int | None = None,
         stop_sequence: int | None = None,
         max_count: int = DEFAULT_HISTORY_MAX_COUNT,
@@ -146,6 +149,7 @@ class InMemoryCaptureHistory(MessageHistory):
             msg_type=msg_type,
             msg_producer=msg_producer,
             bus_operation=bus_operation,
+            sequence_order=sequence_order,
             start_sequence=start_sequence,
             stop_sequence=stop_sequence,
             max_count=max_count,
@@ -170,7 +174,16 @@ class InMemoryCaptureHistory(MessageHistory):
             raise IncompleteMessageHistoryError(
                 "history source returned fewer indexed records than requested"
             )
-        for record in records:
+
+        descending = (
+            selection.sequence_order == HistorySequenceOrder.DESCENDING
+        )
+        if descending:
+            ordered_records = reversed(records)
+        else:
+            ordered_records = records
+
+        for record in ordered_records:
             if not isinstance(record, CapturedMessage):
                 continue
             if not _message_matches(
@@ -182,7 +195,10 @@ class InMemoryCaptureHistory(MessageHistory):
             ):
                 continue
             if len(entries) >= selection.max_count:
-                next_sequence = record.bus_sequence
+                if descending:
+                    next_sequence = entries[-1].bus_sequence
+                else:
+                    next_sequence = record.bus_sequence
                 break
             entries.append(self._entry_for(record))
 
@@ -313,6 +329,13 @@ def decode_history_payload(
 
 
 def _validate_selection(selection: HistorySelection) -> None:
+    valid_order_arguments = (
+        HistorySequenceOrder.ASCENDING, HistorySequenceOrder.DESCENDING
+    )
+    if selection.sequence_order not in valid_order_arguments:
+        raise InvalidHistorySelectionError(
+            f"unsupported sequence order: {selection.sequence_order!r}"
+        )
     if selection.max_count < 1:
         raise InvalidHistorySelectionError(
             f"max_count must be positive: got {selection.max_count}"
