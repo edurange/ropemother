@@ -102,6 +102,7 @@ from ropemother.message.symbols import (
 )
 from ropemother.service.brokerhistory import (
     BrokerHistoryExtension,
+    BrokerHistoryRunner,
     preconfigured_history_client,
 )
 from ropemother.service.connector import connect_transport_client
@@ -155,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T18:54:22+00:00"
+__date__ = "2026-08-14T03:21:53+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev5"
 __status__ = "Development"
@@ -7273,6 +7274,145 @@ async def demo_async_scripted_input_emits_typed_file_payload() -> None:
     print("\n")
 
 
+def demo_history_cursor_continues_selection() -> None:
+    print("Demo: history cursor continues a selection")
+    bus = DirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    history = InMemoryCaptureHistory(sink)
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    requester_name = "requester-foo"
+    responder_name = "responder-bar"
+    client = bus.create_history_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=DEMO_MSG_TYPE,
+        reply_msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    service = bus.create_history_service(
+        history=history,
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=DEMO_MSG_TYPE,
+        reply_msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    emitter.emit({"value": "first"})
+    canonical_payload = {"value": "second"}
+    emitter.emit(canonical_payload)
+
+    handle = client.send(
+        msg_topic=DEMO_TOPIC,
+        msg_type=DEMO_MSG_TYPE,
+        msg_producer=DEMO_PRODUCER,
+        max_count=1,
+    )
+    service.handle()
+    first_page = client.receive(handle)
+
+    handle = client.send(
+        msg_topic=DEMO_TOPIC,
+        msg_type=DEMO_MSG_TYPE,
+        msg_producer=DEMO_PRODUCER,
+        cursor=first_page.next_cursor,
+        max_count=1,
+    )
+    service.handle()
+    second_page = client.receive(handle)
+    received_payload = None
+    if len(second_page.entries) == 1:
+        received_payload = second_page.entries[0].payload
+
+    print(f"{canonical_payload=}")
+    print(f"{received_payload=}")
+    success = received_payload == canonical_payload
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_payload " + eq_string + " canonical_payload")
+
+    print(f"({type(client).__name__}): ", end="")
+    if success:
+        print("History cursor continued the selection to the next page")
+    else:
+        print("History cursor did not continue to the next page")
+    print("\n")
+
+
+def demo_history_select_all_follows_cursors() -> None:
+    print("Demo: history select-all follows cursors across pages")
+    bus = DirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    history = InMemoryCaptureHistory(sink)
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    requester_name = "requester-foo"
+    responder_name = "responder-bar"
+    client = bus.create_history_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=DEMO_MSG_TYPE,
+        reply_msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    service = bus.create_history_service(
+        history=history,
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=DEMO_MSG_TYPE,
+        reply_msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    runner = BrokerHistoryRunner(service)
+    canonical_payloads = (
+        {"value": "first"},
+        {"value": "second"},
+        {"value": "third"},
+    )
+
+    for payload in canonical_payloads:
+        emitter.emit(payload)
+
+    runner.start()
+    entries = client.select_all(
+        msg_topic=DEMO_TOPIC,
+        msg_type=DEMO_MSG_TYPE,
+        msg_producer=DEMO_PRODUCER,
+        max_count=1,
+    )
+    runner.request_stop()
+    runner.join()
+    received_payloads = tuple(entry.payload for entry in entries)
+
+    print(f"{canonical_payloads=}")
+    print(f"{received_payloads=}")
+    success = received_payloads == canonical_payloads
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_payloads " + eq_string + " canonical_payloads")
+
+    print(f"({type(client).__name__}): ", end="")
+    if success:
+        print("History select-all returned every page")
+    else:
+        print("History select-all did not return the complete selection")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7378,6 +7518,8 @@ def run_all_demos() -> None:
     demo_transport_client_delivers_decoded_payload_boundary()
     demo_history_for_requires_readable_capture_sink()
     asyncio.run(demo_async_scripted_input_emits_typed_file_payload())
+    demo_history_cursor_continues_selection()
+    demo_history_select_all_follows_cursors()
 
 
 if __name__ == "__main__":
