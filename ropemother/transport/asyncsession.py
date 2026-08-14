@@ -33,7 +33,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T16:36:48+00:00"
+__date__ = "2026-08-14T19:22:17+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -198,7 +198,7 @@ class AsyncBrokerTransportSession:
             format_id=frame.msg_format_id, payload_bytes=frame.payload_bytes
         )
         try:
-            self._core.emit_serialized_from(
+            message_id = self._core.emit_serialized_from(
                 binding=binding,
                 serialized_payload=serialized_payload,
                 msg_type=msg_type,
@@ -213,7 +213,8 @@ class AsyncBrokerTransportSession:
 
         await self._wait_for_delivery_tasks()
         if frame.result_requested:
-            await self._channel.send_frame(EmitResultFrame())
+            result_frame = EmitResultFrame(msg_id=message_id)
+            await self._channel.send_frame(result_frame)
 
     def _schedule_delivery(
         self, *, subscription_id: TransportSubscriptionID, message: BusMessage

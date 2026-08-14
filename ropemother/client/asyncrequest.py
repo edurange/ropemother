@@ -16,19 +16,21 @@ from ropemother.client.request import (
     InvalidRequestOptionError,
     RequestClientLimits,
     RequestHandle,
+    UnexpectedReplyMessageError,
     UnexpectedRequestMessageError,
+    UnknownRequestHandleError,
     UnboundResponderError,
     _ReplyBuffer,
     _RequestLifecycleTable,
 )
 from ropemother.client.requestoptions import RequestOption, SAME_MSG_TYPE
 from ropemother.format.portableformat import PortableFormat
-from ropemother.message.messageidentity import CorrelationID
+from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:22:21+00:00"
+__date__ = "2026-08-14T22:09:10+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -41,6 +43,7 @@ class AsyncRequester:
     _next_correlation_value: int
     _limits: RequestClientLimits
     _reply_buffer: _ReplyBuffer
+    _pending_requests: dict[MessageID, RequestHandle]
 
     def __init__(
         self,
@@ -55,6 +58,7 @@ class AsyncRequester:
         if limits is not None:
             self._limits = limits
         self._reply_buffer = _ReplyBuffer(self._limits)
+        self._pending_requests = {}
 
     async def request(
         self,
@@ -65,23 +69,42 @@ class AsyncRequester:
     ) -> RequestHandle:
         correlation_id = CorrelationID(self._next_correlation_value)
         self._next_correlation_value += 1
-        await self._emitter.emit_request(
+        request_id = await self._emitter.emit_request(
             payload,
             correlation_id=correlation_id,
             msg_type=msg_type,
             payload_format=payload_format,
         )
-        return RequestHandle(correlation_id)
+        handle = RequestHandle(request_id, correlation_id)
+        self._pending_requests[request_id] = handle
+        return handle
 
     async def receive_reply(self, request: RequestHandle) -> ReceivedMessage:
+        pending_handle = self._pending_requests.get(request._request_id)
+        if pending_handle is not request:
+            raise UnknownRequestHandleError(
+                "request handle is not managed by this requester"
+            )
+
         reply = self._reply_buffer.take(request)
         while reply is None:
             message = await self._reply_receiver.receive()
             self._reply_buffer.validate(message)
+            reply_to = message.reply_to
+            pending_handle = self._pending_requests.get(reply_to)
+            if pending_handle is None:
+                continue
+            expected_correlation_id = pending_handle._correlation_id
+            if message.correlation_id != expected_correlation_id:
+                raise UnexpectedReplyMessageError(
+                    "requester received a reply with a mismatched correlation "
+                    "ID"
+                )
             if self._reply_buffer.matches(request, message):
                 reply = message
             else:
                 self._reply_buffer.hold(message)
+        del self._pending_requests[request._request_id]
         return reply
 
 

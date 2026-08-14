@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T20:30:24+00:00"
+__date__ = "2026-08-14T18:50:03+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -379,7 +379,7 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
-    ) -> None:
+    ) -> MessageID:
         resolved_msg_type = binding.resolve_msg_type(msg_type)
         resolved_payload_format = binding.format_policy.resolve_payload_format(
             msg_type=resolved_msg_type, payload_format=payload_format
@@ -396,7 +396,7 @@ class DirectBrokerCore:
             binding=binding, payload_format=resolved_payload_format
         )
 
-        self._emit(
+        message_id = self._emit(
             payload=payload,
             msg_format=resolved_payload_format,
             msg_format_id=resolved_format_id,
@@ -410,6 +410,7 @@ class DirectBrokerCore:
             correlation_id=correlation_id,
             reply_to=reply_to,
         )
+        return message_id
 
     def emit_serialized_from(
         self,
@@ -420,7 +421,7 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
-    ) -> None:
+    ) -> MessageID:
         resolved_msg_type = binding.resolve_msg_type(msg_type)
         resolved_msg_type_id = self._resolve_msg_type_id(
             binding=binding, msg_type=resolved_msg_type
@@ -437,7 +438,7 @@ class DirectBrokerCore:
             serialized_payload=serialized_payload, msg_format=payload_format
         )
 
-        self._deliver(
+        message_id = self._deliver(
             payload=payload,
             serialized_payload=serialized_payload,
             msg_topic=binding.msg_topic,
@@ -450,6 +451,7 @@ class DirectBrokerCore:
             correlation_id=correlation_id,
             reply_to=reply_to,
         )
+        return message_id
 
     def registrations_for(
         self, item: EmitterBinding | SubscriptionBinding | BusMessage
@@ -480,14 +482,14 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
-    ) -> None:
+    ) -> MessageID:
         serialized_payload = self._serialize_payload(
             payload=payload, msg_format=msg_format, msg_format_id=msg_format_id
         )
         decoded_payload = self._decode_payload(
             serialized_payload=serialized_payload, msg_format=msg_format
         )
-        self._deliver(
+        message_id = self._deliver(
             payload=decoded_payload,
             serialized_payload=serialized_payload,
             msg_topic=msg_topic,
@@ -500,6 +502,7 @@ class DirectBrokerCore:
             correlation_id=correlation_id,
             reply_to=reply_to,
         )
+        return message_id
 
     def _deliver(
         self,
@@ -515,7 +518,7 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
-    ) -> None:
+    ) -> MessageID:
         message = self._build_message(
             payload=payload,
             serialized_payload=serialized_payload,
@@ -535,6 +538,7 @@ class DirectBrokerCore:
         self._capture_controller.write_message_record(message.captured_view())
         for receiver in matching_receivers:
             receiver.deliver(message)
+        return message.msg_id
 
     def _ensure_bootstrap_message_allowed(self, message: BusMessage) -> None:
         if self._capture_controller.state is not CaptureState.BOOTSTRAPPING:

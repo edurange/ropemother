@@ -43,7 +43,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:43:31+00:00"
+__date__ = "2026-08-14T19:01:32+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -505,7 +505,7 @@ def _decode_register_msg_type_result_frame(
 
 
 def _encode_emit_result_frame(frame: EmitResultFrame) -> FrameParts:
-    metadata = {"frame_type": "emit_result"}
+    metadata = {"frame_type": "emit_result", "msg_id": int(frame.msg_id)}
     return _metadata_parts(metadata)
 
 
@@ -513,7 +513,7 @@ def _decode_emit_result_frame(
     metadata: Metadata, payload_bytes: bytes | None
 ) -> EmitResultFrame:
     _reject_unexpected_payload(payload_bytes)
-    return EmitResultFrame()
+    return EmitResultFrame(msg_id=MessageID(metadata["msg_id"]))
 
 
 def _reject_unexpected_payload(payload_bytes: bytes | None) -> None:

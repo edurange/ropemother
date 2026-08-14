@@ -31,7 +31,7 @@ from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
 )
 from ropemother.format.registry import PortableFormatRegistry
-from ropemother.message.messageidentity import CorrelationID
+from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import (
     BusMessage,
     BusOperation,
@@ -49,7 +49,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:08:24+00:00"
+__date__ = "2026-08-14T18:51:23+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -197,8 +197,8 @@ class _BrokerEmitter(Emitter):
         correlation_id: CorrelationID,
         msg_type: str | None = None,
         payload_format: PortableFormat[Any, Any] | None = None,
-    ) -> None:
-        self._core.emit_from(
+    ) -> MessageID:
+        request_id = self._core.emit_from(
             binding=self._binding,
             payload=payload,
             msg_type=msg_type,
@@ -206,6 +206,7 @@ class _BrokerEmitter(Emitter):
             bus_operation=BusOperation.REQUEST,
             correlation_id=correlation_id,
         )
+        return request_id
 
     def emit_reply(
         self,

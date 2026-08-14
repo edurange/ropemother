@@ -20,7 +20,7 @@ from ropemother.util.typedid import TypedID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:42:54+00:00"
+__date__ = "2026-08-14T18:59:24+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -103,7 +103,7 @@ class EmitFrame:
 @dataclass(frozen=True, kw_only=True)
 class EmitResultFrame:
     """Transport reply acknowledging an emit request."""
-    pass
+    msg_id: MessageID
 
 
 @dataclass(frozen=True, kw_only=True)

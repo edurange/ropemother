@@ -64,7 +64,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:15:20+00:00"
+__date__ = "2026-08-14T19:39:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -426,7 +426,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         correlation_id: CorrelationID,
         msg_type: str | None = None,
         payload_format: PortableFormat[Any, Any] | None = None,
-    ) -> None:
+    ) -> MessageID:
         await self._emit_frame(
             payload=payload,
             msg_type=msg_type,
@@ -434,7 +434,8 @@ class AsyncTransportEmitter(AsyncEmitter):
             bus_operation=BusOperation.REQUEST,
             correlation_id=correlation_id,
         )
-        await self._client._receive_expected_frame(EmitResultFrame)
+        result = await self._client._receive_expected_frame(EmitResultFrame)
+        return result.msg_id
 
     async def emit_reply(
         self,

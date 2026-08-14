@@ -16,12 +16,12 @@ from ropemother.client.procedure import (
 from ropemother.client.requestoptions import RequestOption, SAME_MSG_TYPE
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat
-from ropemother.message.messageidentity import CorrelationID
+from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:15:49+00:00"
+__date__ = "2026-08-14T22:07:25+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -93,135 +93,14 @@ class RequestClientLimits:
 @dataclass(frozen=True)
 class RequestHandle:
     """Opaque handle for receiving a pending request reply."""
+    _request_id: MessageID
     _correlation_id: CorrelationID
 
 
 @dataclass(frozen=True)
 class _PendingRequest:
     handle: RequestHandle
-    correlation_id: CorrelationID
-
-
-class _RetiredCorrelationCache:
-    _max_size: int
-    _order: deque[CorrelationID]
-    _members: set[CorrelationID]
-
-    def __init__(self, max_size: int) -> None:
-        self._max_size = max_size
-        self._order = deque()
-        self._members = set()
-
-    def add(self, correlation_id: CorrelationID) -> None:
-        if self._max_size == 0:
-            return
-
-        if correlation_id in self._members:
-            return
-
-        self._order.append(correlation_id)
-        self._members.add(correlation_id)
-
-        while len(self._order) > self._max_size:
-            evicted = self._order.popleft()
-            self._members.remove(evicted)
-
-    def contains(self, correlation_id: CorrelationID) -> bool:
-        return correlation_id in self._members
-
-
-class _ReplyBuffer:
-    _limits: RequestClientLimits
-    _held_replies: dict[CorrelationID, ReceivedMessage]
-
-    def __init__(self, limits: RequestClientLimits) -> None:
-        self._limits = limits
-        self._held_replies = {}
-
-    def take(self, request: RequestHandle) -> ReceivedMessage | None:
-        correlation_id = request._correlation_id
-        return self._held_replies.pop(correlation_id, None)
-
-    def hold(self, message: ReceivedMessage) -> None:
-        correlation_id = message.correlation_id
-        if correlation_id is None:
-            raise UnexpectedReplyMessageError(
-                "requester received a reply without a correlation ID"
-            )
-
-        if correlation_id in self._held_replies:
-            raise DuplicateReplyError(
-                "requester received multiple replies for one request"
-            )
-
-        if len(self._held_replies) >= self._limits.max_ready_replies:
-            raise ReplyBufferCapacityError(
-                "requester reply buffer capacity was exceeded"
-            )
-
-        self._held_replies[correlation_id] = message
-
-    def matches(
-        self, request: RequestHandle, message: ReceivedMessage
-    ) -> bool:
-        reply_matches = (
-            message.bus_operation == BusOperation.REPLY
-            and message.correlation_id == request._correlation_id
-        )
-        return reply_matches
-
-    def validate(self, message: ReceivedMessage) -> None:
-        if message.bus_operation != BusOperation.REPLY:
-            raise UnexpectedReplyMessageError(
-                "requester received a message that is not a reply"
-            )
-        if message.correlation_id is None:
-            raise UnexpectedReplyMessageError(
-                "requester received a reply without a correlation ID"
-            )
-
-
-class _RequestLifecycleTable:
-    _pending: dict[CorrelationID, _PendingRequest]
-    _retired: _RetiredCorrelationCache
-    _limits: RequestClientLimits
-
-    def __init__(self, limits: RequestClientLimits) -> None:
-        self._pending = {}
-        self._limits = limits
-        self._retired = _RetiredCorrelationCache(limits.max_retired)
-
-    def ensure_can_start(self) -> None:
-        if len(self._pending) >= self._limits.max_pending:
-            raise RequestClientCapacityError(
-                "request client pending capacity was exceeded"
-            )
-
-    def add_pending(self, handle: RequestHandle) -> None:
-        correlation_id = handle._correlation_id
-        self._pending[correlation_id] = _PendingRequest(
-            handle=handle, correlation_id=correlation_id
-        )
-
-    def validate_pending(self, handle: RequestHandle) -> None:
-        correlation_id = handle._correlation_id
-        if correlation_id in self._pending:
-            return
-
-        if self._retired.contains(correlation_id):
-            raise CompletedRequestHandleError(
-                "request handle has already received a reply"
-            )
-
-        raise UnknownRequestHandleError(
-            "request handle is not managed by this request client"
-        )
-
-    def complete(self, handle: RequestHandle) -> None:
-        self.validate_pending(handle)
-        correlation_id = handle._correlation_id
-        del self._pending[correlation_id]
-        self._retired.add(correlation_id)
+    request_id: MessageID
 
 
 class Requester:
@@ -230,7 +109,8 @@ class Requester:
     _reply_receiver: ReceiveEndpoint
     _next_correlation_value: int
     _limits: RequestClientLimits
-    _reply_buffer: _ReplyBuffer
+    _reply_buffer: "_ReplyBuffer"
+    _pending_requests: dict[MessageID, RequestHandle]
 
     def __init__(
         self,
@@ -245,6 +125,7 @@ class Requester:
         if limits is not None:
             self._limits = limits
         self._reply_buffer = _ReplyBuffer(self._limits)
+        self._pending_requests = {}
 
     def request(
         self,
@@ -255,23 +136,42 @@ class Requester:
     ) -> RequestHandle:
         correlation_id = CorrelationID(self._next_correlation_value)
         self._next_correlation_value += 1
-        self._emitter.emit_request(
+        request_id = self._emitter.emit_request(
             payload,
             correlation_id=correlation_id,
             msg_type=msg_type,
             payload_format=payload_format,
         )
-        return RequestHandle(correlation_id)
+        handle = RequestHandle(request_id, correlation_id)
+        self._pending_requests[request_id] = handle
+        return handle
 
     def receive_reply(self, request: RequestHandle) -> ReceivedMessage:
+        pending_handle = self._pending_requests.get(request._request_id)
+        if pending_handle is not request:
+            raise UnknownRequestHandleError(
+                "request handle is not managed by this requester"
+            )
+
         reply = self._reply_buffer.take(request)
         while reply is None:
             message = self._reply_receiver.receive()
             self._reply_buffer.validate(message)
+            reply_to = message.reply_to
+            pending_handle = self._pending_requests.get(reply_to)
+            if pending_handle is None:
+                continue
+            expected_correlation_id = pending_handle._correlation_id
+            if message.correlation_id != expected_correlation_id:
+                raise UnexpectedReplyMessageError(
+                    "requester received a reply with a mismatched correlation "
+                    "ID"
+                )
             if self._reply_buffer.matches(request, message):
                 reply = message
             else:
                 self._reply_buffer.hold(message)
+        del self._pending_requests[request._request_id]
         return reply
 
 
@@ -438,7 +338,7 @@ class RequestClient:
     """Client endpoint for sending requests and receiving replies."""
     _requester: Requester
     _limits: RequestClientLimits
-    _requests: _RequestLifecycleTable
+    _requests: "_RequestLifecycleTable"
 
     def __init__(
         self, requester: Requester, limits: RequestClientLimits | None = None
@@ -547,3 +447,122 @@ class ProcedureService:
             *invocation.positional_arguments, **keyword_arguments
         )
         request.reply(reply_payload)
+
+
+class _RetiredRequestCache:
+    _max_size: int
+    _order: deque[RequestHandle]
+
+    def __init__(self, max_size: int) -> None:
+        self._max_size = max_size
+        self._order = deque()
+
+    def add(self, handle: RequestHandle) -> None:
+        if self._max_size == 0:
+            return
+
+        self._order.append(handle)
+        while len(self._order) > self._max_size:
+            self._order.popleft()
+
+    def contains(self, handle: RequestHandle) -> bool:
+        return any(retired is handle for retired in self._order)
+
+
+class _ReplyBuffer:
+    _limits: RequestClientLimits
+    _held_replies: dict[MessageID, ReceivedMessage]
+
+    def __init__(self, limits: RequestClientLimits) -> None:
+        self._limits = limits
+        self._held_replies = {}
+
+    def take(self, request: RequestHandle) -> ReceivedMessage | None:
+        return self._held_replies.pop(request._request_id, None)
+
+    def hold(self, message: ReceivedMessage) -> None:
+        reply_to = message.reply_to
+        if reply_to is None:
+            raise UnexpectedReplyMessageError(
+                "requester received a reply without a reply target"
+            )
+
+        if reply_to in self._held_replies:
+            raise DuplicateReplyError(
+                "requester received multiple replies for one request"
+            )
+
+        if len(self._held_replies) >= self._limits.max_ready_replies:
+            raise ReplyBufferCapacityError(
+                "requester reply buffer capacity was exceeded"
+            )
+
+        self._held_replies[reply_to] = message
+
+    def matches(
+        self, request: RequestHandle, message: ReceivedMessage
+    ) -> bool:
+        reply_matches = (
+            message.bus_operation == BusOperation.REPLY
+            and message.reply_to == request._request_id
+            and message.correlation_id == request._correlation_id
+        )
+        return reply_matches
+
+    def validate(self, message: ReceivedMessage) -> None:
+        if message.bus_operation != BusOperation.REPLY:
+            raise UnexpectedReplyMessageError(
+                "requester received a message that is not a reply"
+            )
+        if message.correlation_id is None:
+            raise UnexpectedReplyMessageError(
+                "requester received a reply without a correlation ID"
+            )
+        if message.reply_to is None:
+            raise UnexpectedReplyMessageError(
+                "requester received a reply without a reply target"
+            )
+
+
+class _RequestLifecycleTable:
+    _pending: dict[MessageID, _PendingRequest]
+    _retired: "_RetiredRequestCache"
+    _limits: RequestClientLimits
+
+    def __init__(self, limits: RequestClientLimits) -> None:
+        self._pending = {}
+        self._limits = limits
+        self._retired = _RetiredRequestCache(limits.max_retired)
+
+    def ensure_can_start(self) -> None:
+        if len(self._pending) >= self._limits.max_pending:
+            raise RequestClientCapacityError(
+                "request client pending capacity was exceeded"
+            )
+
+    def add_pending(self, handle: RequestHandle) -> None:
+        request_id = handle._request_id
+        self._pending[request_id] = _PendingRequest(
+            handle=handle, request_id=request_id
+        )
+
+    def validate_pending(self, handle: RequestHandle) -> None:
+        request_id = handle._request_id
+        pending = self._pending.get(request_id)
+        if pending is not None and pending.handle is handle:
+            return
+
+        if self._retired.contains(handle):
+            raise CompletedRequestHandleError(
+                "request handle has already received a reply"
+            )
+
+        raise UnknownRequestHandleError(
+            "request handle is not managed by this request client"
+        )
+
+    def complete(self, handle: RequestHandle) -> None:
+        self.validate_pending(handle)
+        request_id = handle._request_id
+        del self._pending[request_id]
+        self._retired.add(handle)

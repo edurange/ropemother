@@ -3,8 +3,8 @@
 
 """Abstract interfaces for message bus participants."""
 
-from abc import ABC, abstractmethod
-from typing import Any
+import abc
+import typing
 
 from ropemother.exceptions import (
     InvalidReceiveCountError,
@@ -16,7 +16,7 @@ from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T03:17:53+00:00"
+__date__ = "2026-08-14T16:56:27+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -42,46 +42,46 @@ class UnsupportedTypeFormatError(ValueError, EndpointUsageError):
     pass
 
 
-class Emitter(ABC):
+class Emitter(abc.ABC):
     """Endpoint that publishes messages from a registered producer."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def emit(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
     ) -> None:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def emit_request(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
-    ) -> None:
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+    ) -> MessageID:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def emit_reply(
         self,
         request: ReceivedMessage,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
     ) -> None:
         ...
 
 
-class ReceiveEndpoint(ABC):
+class ReceiveEndpoint(abc.ABC):
     """Minimal endpoint that can receive one message."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def receive(self) -> ReceivedMessage:
         ...
 
@@ -89,7 +89,7 @@ class ReceiveEndpoint(ABC):
 class Receiver(ReceiveEndpoint):
     """Endpoint that receives subscribed messages with convenience methods."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def _receive_batch(
         self, *, min_count: int, max_count: int | None
     ) -> list[ReceivedMessage]:

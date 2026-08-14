@@ -36,7 +36,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T16:34:43+00:00"
+__date__ = "2026-08-14T19:02:37+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -202,7 +202,7 @@ class BrokerTransportSession:
             format_id=frame.msg_format_id, payload_bytes=frame.payload_bytes
         )
         try:
-            self._core.emit_serialized_from(
+            message_id = self._core.emit_serialized_from(
                 binding=binding,
                 serialized_payload=serialized_payload,
                 msg_type=msg_type,
@@ -216,7 +216,8 @@ class BrokerTransportSession:
             return
 
         if frame.result_requested:
-            self._channel.send_frame(EmitResultFrame())
+            result_frame = EmitResultFrame(msg_id=message_id)
+            self._channel.send_frame(result_frame)
 
     def _send_error_frame(self, error: MessageBusBaseException) -> None:
         error_frame = TransportErrorFrame(

@@ -4,12 +4,12 @@
 """A preliminary demonstration/verification of module features."""
 
 import asyncio
-from dataclasses import dataclass, field
-from functools import partial
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from threading import Thread
-from typing import Any
+import dataclasses
+import functools
+import pathlib
+import tempfile
+import threading
+import typing
 
 from ropemother.bootstrap.policy import (
     BootstrapMessageRejectedError,
@@ -156,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T03:21:53+00:00"
+__date__ = "2026-08-14T23:00:15+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -817,7 +817,7 @@ async def demo_async_receive_waits_for_message() -> None:
 
 
 async def record_payload(
-    observed_records: list[Any], message: ReceivedMessage
+    observed_records: list[typing.Any], message: ReceivedMessage
 ) -> None:
     observed_records.append(message.payload)
 
@@ -844,7 +844,7 @@ async def demo_async_batch_receiver_handler() -> None:
     ]
     canonical_count = len(canonical_records)
     observed_records = []
-    handler = partial(record_payload, observed_records)
+    handler = functools.partial(record_payload, observed_records)
 
     for record in canonical_records:
         await emitter.emit(record)
@@ -1119,8 +1119,8 @@ def _handle_transport_session_frames(
 
 def _service_transport_session(
     session: BrokerTransportSession, frame_count: int
-) -> Thread:
-    worker = Thread(
+) -> threading.Thread:
+    worker = threading.Thread(
         target=_handle_transport_session_frames, args=(session, frame_count)
     )
     worker.start()
@@ -2091,7 +2091,7 @@ def demo_procedure_facade() -> None:
 
     canonical_request = "foo"
     canonical_reply = _unary_procedure_handler(canonical_request)
-    worker = Thread(target=service.handle)
+    worker = threading.Thread(target=service.handle)
     worker.start()
     received_reply_payload = client(canonical_request)
     worker.join()
@@ -3192,7 +3192,7 @@ def demo_transport_procedure_facade() -> None:
 
     canonical_request = "foo"
     canonical_reply = _unary_procedure_handler(canonical_request)
-    service_worker = Thread(target=service.handle)
+    service_worker = threading.Thread(target=service.handle)
     requester_worker = _service_transport_session(requester_session, 1)
     responder_worker = _service_transport_session(responder_session, 1)
     service_worker.start()
@@ -3277,7 +3277,7 @@ def demo_socket_transport_procedure_facade() -> None:
 
     canonical_request = "foo"
     canonical_reply = _unary_procedure_handler(canonical_request)
-    service_worker = Thread(target=service.handle)
+    service_worker = threading.Thread(target=service.handle)
     service_worker.start()
     received_reply_payload = client(canonical_request)
     service_worker.join()
@@ -4115,13 +4115,15 @@ async def demo_immediate_async_endpoint_provisioner() -> None:
 
 def demo_message_bus_service_routes_between_clients() -> None:
     print("Demo: message bus service routes between clients")
-    with TemporaryDirectory() as runtime_dir:
-        socket_path = Path(runtime_dir) / "ropemother-service-demo.sock"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        socket_path = (
+            pathlib.Path(runtime_dir) / "ropemother-service-demo.sock"
+        )
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
         format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
         service = MessageBusService.from_listener(bus=bus, listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         producer_client = connect_transport_client(
@@ -4511,14 +4513,16 @@ async def demo_async_transport_emit_reports_rejection() -> None:
 
 def demo_message_bus_service_capture_bootstrap() -> None:
     print("Demo: message bus service capture bootstrap")
-    with TemporaryDirectory() as runtime_dir:
-        socket_path = Path(runtime_dir) / "ropemother-bootstrap-demo.sock"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        socket_path = (
+            pathlib.Path(runtime_dir) / "ropemother-bootstrap-demo.sock"
+        )
         listener = LocalBusServiceListener.from_socket_path(socket_path)
         format_registry = PortableFormatRegistry(
             JSON_PORTABLE_FORMAT, RAW_BYTES_PORTABLE_FORMAT
         )
         service = MessageBusService.capture_bootstrap(listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         lifecycle_client = connect_transport_client(
@@ -4601,13 +4605,13 @@ def demo_message_bus_service_capture_bootstrap() -> None:
 
 def demo_message_bus_service_contact_variable() -> None:
     print("Demo: clients connect using bus contact variable")
-    with TemporaryDirectory() as runtime_dir:
-        socket_path = Path(runtime_dir) / "ropemother-env-demo.sock"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        socket_path = pathlib.Path(runtime_dir) / "ropemother-env-demo.sock"
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
         format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
         service = MessageBusService.from_listener(bus=bus, listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         variables = {}
         descriptor = service.connection_descriptor()
@@ -4658,13 +4662,15 @@ def demo_message_bus_service_contact_variable() -> None:
 
 def demo_message_bus_service_contact_handoff() -> None:
     print("Demo: bus contact handoff preserves source variables")
-    with TemporaryDirectory() as runtime_dir:
-        socket_path = Path(runtime_dir) / "ropemother-env-vars-demo.sock"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        socket_path = (
+            pathlib.Path(runtime_dir) / "ropemother-env-vars-demo.sock"
+        )
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
         format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
         service = MessageBusService.from_listener(bus=bus, listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         source_variables = {"FOO": "bar"}
         descriptor = service.connection_descriptor()
@@ -4720,15 +4726,15 @@ def demo_message_bus_service_contact_handoff() -> None:
 
 def demo_message_bus_service_contact_helper() -> None:
     print("Demo: service prepares a valid bus contact handoff value")
-    with TemporaryDirectory() as runtime_dir:
+    with tempfile.TemporaryDirectory() as runtime_dir:
         socket_path = (
-            Path(runtime_dir) / "ropemother-service-env-vars-demo.sock"
+            pathlib.Path(runtime_dir) / "ropemother-service-env-vars-demo.sock"
         )
         bus = DirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
         listener = LocalBusServiceListener.from_socket_path(socket_path)
         format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
         service = MessageBusService.from_listener(bus=bus, listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         source_variables = {"FOO": "bar"}
         contact_variables = service.bus_contact_variables(
@@ -4781,7 +4787,7 @@ def demo_message_bus_service_contact_helper() -> None:
     print("\n")
 
 
-def _read_capture_records(path: Path) -> list[dict[str, Any]]:
+def _read_capture_records(path: pathlib.Path) -> list[dict[str, typing.Any]]:
     records = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line:
@@ -4791,8 +4797,8 @@ def _read_capture_records(path: Path) -> list[dict[str, Any]]:
 
 def demo_message_bus_service_file_capture_bootstrap() -> None:
     print("Demo: message bus service file capture bootstrap")
-    with TemporaryDirectory() as runtime_dir:
-        runtime_path = Path(runtime_dir)
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        runtime_path = pathlib.Path(runtime_dir)
         socket_path = runtime_path / "ropemother-file-bootstrap-demo.sock"
         capture_path = runtime_path / "capture.jsonl"
         listener = LocalBusServiceListener.from_socket_path(socket_path)
@@ -4800,7 +4806,7 @@ def demo_message_bus_service_file_capture_bootstrap() -> None:
             JSON_PORTABLE_FORMAT, RAW_BYTES_PORTABLE_FORMAT
         )
         service = MessageBusService.capture_bootstrap(listener=listener)
-        service_thread = Thread(target=service.serve_forever)
+        service_thread = threading.Thread(target=service.serve_forever)
         service_thread.start()
         descriptor = service.connection_descriptor()
         lifecycle_client = connect_transport_client(
@@ -6237,8 +6243,8 @@ def demo_scripted_input_emits_typed_file_payload() -> None:
     file_line = oneline_serialize(file_record)
     extra_formats = (payload_format,)
 
-    with TemporaryDirectory() as temp_dir:
-        input_path = Path(temp_dir) / "input.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        input_path = pathlib.Path(runtime_dir) / "input.jsonl"
         input_path.write_text(file_line, encoding="utf-8")
         input_plan = ScriptedInputPlan.from_jsonl(
             input_path, extra_formats=extra_formats
@@ -6276,8 +6282,8 @@ def demo_scripted_input_emits_typed_file_payload() -> None:
 
 def demo_jsonl_capture_history_selects_messages() -> None:
     print("Demo: JSONL capture history selects messages")
-    with TemporaryDirectory() as runtime_dir:
-        capture_path = Path(runtime_dir) / "capture.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        capture_path = pathlib.Path(runtime_dir) / "capture.jsonl"
 
         bus = DirectMessageBus()
         sink = JSONLinesCaptureSink(capture_path, append=False)
@@ -6330,8 +6336,8 @@ def demo_jsonl_capture_history_selects_messages() -> None:
 
 def demo_jsonl_history_query_service_selects_messages() -> None:
     print("Demo: JSONL history query service selects messages")
-    with TemporaryDirectory() as runtime_dir:
-        capture_path = Path(runtime_dir) / "capture.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        capture_path = pathlib.Path(runtime_dir) / "capture.jsonl"
 
         bus = DirectMessageBus()
         sink = JSONLinesCaptureSink(capture_path, append=False)
@@ -6412,8 +6418,8 @@ def demo_jsonl_history_query_service_selects_messages() -> None:
 
 def demo_jsonl_capture_history_reconstructs_payload_formats() -> None:
     print("Demo: JSONL capture history reconstructs payload formats")
-    with TemporaryDirectory() as runtime_dir:
-        capture_path = Path(runtime_dir) / "capture.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        capture_path = pathlib.Path(runtime_dir) / "capture.jsonl"
 
         bus = DirectMessageBus()
         sink = JSONLinesCaptureSink(capture_path, append=False)
@@ -6478,8 +6484,8 @@ def demo_jsonl_capture_history_reconstructs_payload_formats() -> None:
 
 async def demo_async_jsonl_history_query_service_selects_messages() -> None:
     print("Demo: async JSONL history query service selects messages")
-    with TemporaryDirectory() as runtime_dir:
-        capture_path = Path(runtime_dir) / "capture.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        capture_path = pathlib.Path(runtime_dir) / "capture.jsonl"
 
         bus = AsyncDirectMessageBus()
         sink = JSONLinesCaptureSink(capture_path, append=False)
@@ -6834,8 +6840,8 @@ def demo_register_emitter_rejects_invalid_message_names() -> None:
 
 async def demo_async_socket_service_history_facade() -> None:
     print("Demo: async socket service history facade")
-    with TemporaryDirectory() as runtime_dir:
-        runtime_path = Path(runtime_dir)
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        runtime_path = pathlib.Path(runtime_dir)
         socket_path = runtime_path / "ropemother-async-history-demo.sock"
         capture_path = runtime_path / "ropemother-async-history-demo.jsonl"
         format_registry = default_portable_format_registry()
@@ -6915,8 +6921,8 @@ async def demo_async_socket_service_history_facade() -> None:
 
 def demo_local_message_bus_host_broker_history() -> None:
     print("Demo: local message bus host preconfigured broker history")
-    with TemporaryDirectory() as runtime_dir:
-        runtime_path = Path(runtime_dir)
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        runtime_path = pathlib.Path(runtime_dir)
         capture_path = runtime_path / "capture.jsonl"
         sink = JSONLinesCaptureSink(capture_path, append=False)
         history = JSONLinesCaptureHistory(
@@ -7010,8 +7016,8 @@ def demo_history_for_shares_live_format_registry() -> None:
 
 def demo_jsonl_capture_history_uses_extra_formats() -> None:
     print("Demo: JSONL capture history uses extra formats")
-    with TemporaryDirectory() as runtime_dir:
-        capture_path = Path(runtime_dir) / "capture.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        capture_path = pathlib.Path(runtime_dir) / "capture.jsonl"
         sink = JSONLinesCaptureSink(capture_path, append=False)
         bus = DirectMessageBus(capture_sink=sink)
         emitter = bus.register_emitter(
@@ -7051,30 +7057,30 @@ def demo_jsonl_capture_history_uses_extra_formats() -> None:
     print("\n")
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class _BoundarySourcePayload:
     value: str
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class _BoundaryReceivedPayload:
     value: str
 
 
-class _BoundaryPayloadAdapter(TypeAdapter[Any, bytes]):
-    def encode(self, value: Any) -> bytes:
+class _BoundaryPayloadAdapter(TypeAdapter[typing.Any, bytes]):
+    def encode(self, value: typing.Any) -> bytes:
         if not isinstance(value, _BoundarySourcePayload):
             raise TypeError(
                 "boundary payload demo can only encode source payloads"
             )
         return value.value.encode("utf-8")
 
-    def decode(self, data: bytes) -> Any:
+    def decode(self, data: bytes) -> typing.Any:
         value = data.decode("utf-8")
         return _BoundaryReceivedPayload(value=value)
 
 
-DEMO_BOUNDARY_PAYLOAD_FORMAT = PortableFormat[Any, bytes](
+DEMO_BOUNDARY_PAYLOAD_FORMAT = PortableFormat[typing.Any, bytes](
     key=PortableFormatKey.from_str("demo-boundary-payload"),
     adapter=_BoundaryPayloadAdapter(),
     serializer=IDENTITY_SERIALIZER,
@@ -7236,8 +7242,8 @@ async def demo_async_scripted_input_emits_typed_file_payload() -> None:
     file_line = oneline_serialize(file_record)
     extra_formats = (payload_format,)
 
-    with TemporaryDirectory() as temp_dir:
-        input_path = Path(temp_dir) / "input.jsonl"
+    with tempfile.TemporaryDirectory() as runtime_dir:
+        input_path = pathlib.Path(runtime_dir) / "input.jsonl"
         input_path.write_text(file_line, encoding="utf-8")
         input_plan = ScriptedInputPlan.from_jsonl(
             input_path, extra_formats=extra_formats
@@ -7413,6 +7419,136 @@ def demo_history_select_all_follows_cursors() -> None:
     print("\n")
 
 
+def demo_request_clients_keep_replies_separate() -> None:
+    print("Demo: request clients keep replies separate")
+    bus = DirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    requester_name = "requester-foo"
+    responder_name = "responder-bar"
+    request_name = "query-corge"
+    reply_name = "result-grault"
+
+    first_client = bus.create_request_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+    second_client = bus.create_request_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+    service = bus.create_request_service(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+
+    canonical_first_request = {"foo": "bar"}
+    canonical_second_request = {"fred": "plugh"}
+    canonical_first_reply = {"qux": "quux"}
+    canonical_second_reply = {"garply": "waldo"}
+
+    first_client.send(canonical_first_request)
+    second_handle = second_client.send(canonical_second_request)
+    first_request = service.receive()
+    second_request = service.receive()
+    first_request.reply(canonical_first_reply)
+    second_request.reply(canonical_second_reply)
+    second_reply = second_client.receive(second_handle)
+    received_second_reply = second_reply.payload
+
+    print(f"{canonical_second_reply=}")
+    print(f"{received_second_reply=}")
+    success = received_second_reply == canonical_second_reply
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_second_reply " + eq_string + " canonical_second_reply")
+
+    print(f"({type(second_client).__name__}): ", end="")
+    if success:
+        print("Kept replies separate")
+    else:
+        print("Mixed replies between clients")
+    print("\n")
+
+
+async def demo_async_request_clients_keep_replies_separate() -> None:
+    print("Demo: async request clients keep replies separate")
+    bus = AsyncDirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    requester_name = "requester-foo"
+    responder_name = "responder-bar"
+    request_name = "query-corge"
+    reply_name = "result-grault"
+
+    first_client = bus.create_request_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+    second_client = bus.create_request_client(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+    service = bus.create_request_service(
+        request_topic=DEMO_TOPIC,
+        reply_topic=DEMO_TOPIC,
+        requester_producer=requester_name,
+        responder_producer=responder_name,
+        request_msg_type=request_name,
+        reply_msg_type=reply_name,
+    )
+
+    canonical_first_request = {"foo": "bar"}
+    canonical_second_request = {"fred": "plugh"}
+    canonical_first_reply = {"qux": "quux"}
+    canonical_second_reply = {"garply": "waldo"}
+
+    await first_client.send(canonical_first_request)
+    second_handle = await second_client.send(canonical_second_request)
+    first_request = await service.receive()
+    second_request = await service.receive()
+    await first_request.reply(canonical_first_reply)
+    await second_request.reply(canonical_second_reply)
+    second_reply = await second_client.receive(second_handle)
+    received_second_reply = second_reply.payload
+
+    print(f"{canonical_second_reply=}")
+    print(f"{received_second_reply=}")
+    success = received_second_reply == canonical_second_reply
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_second_reply " + eq_string + " canonical_second_reply")
+
+    print(f"({type(second_client).__name__}): ", end="")
+    if success:
+        print("Kept replies separate")
+    else:
+        print("Mixed replies between clients")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7520,6 +7656,8 @@ def run_all_demos() -> None:
     asyncio.run(demo_async_scripted_input_emits_typed_file_payload())
     demo_history_cursor_continues_selection()
     demo_history_select_all_follows_cursors()
+    demo_request_clients_keep_replies_separate()
+    asyncio.run(demo_async_request_clients_keep_replies_separate())
 
 
 if __name__ == "__main__":

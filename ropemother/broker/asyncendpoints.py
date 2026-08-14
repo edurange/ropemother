@@ -3,68 +3,68 @@
 
 """Asynchronous abstract interfaces for message bus participants."""
 
-from abc import ABC, abstractmethod
-from typing import Any
+import abc
+import typing
 
 from ropemother.exceptions import InvalidReceiveCountError
 from ropemother.format.portableformat import PortableFormat
-from ropemother.message.messageidentity import CorrelationID
+from ropemother.message.messageidentity import CorrelationID, MessageID
 from ropemother.message.records import ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T03:21:36+00:00"
+__date__ = "2026-08-14T16:58:28+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
 
 
-class AsyncEmitter(ABC):
+class AsyncEmitter(abc.ABC):
     """Async endpoint that publishes messages from a registered producer."""
 
-    @abstractmethod
+    @abc.abstractmethod
     async def emit(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
     ) -> None:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     async def emit_request(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
-    ) -> None:
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+    ) -> MessageID:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     async def emit_reply(
         self,
         request: ReceivedMessage,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
     ) -> None:
         ...
 
 
-class AsyncReceiver(ABC):
+class AsyncReceiver(abc.ABC):
     """Async subscriber endpoint with convenience methods."""
 
-    @abstractmethod
+    @abc.abstractmethod
     async def _receive_batch(
         self, *, min_count: int, max_count: int | None
     ) -> list[ReceivedMessage]:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _receive_batch_nowait(
         self, *, max_count: int | None
     ) -> list[ReceivedMessage]:
