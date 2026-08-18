@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T18:50:03+00:00"
+__date__ = "2026-08-18T19:37:06+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -331,6 +331,14 @@ class DirectBrokerCore:
         delivery_target: BrokerDeliveryTarget,
     ) -> None:
         self._receivers.append((subscription, delivery_target))
+
+    def remove_receiver(
+        self, *, delivery_target: BrokerDeliveryTarget
+    ) -> None:
+        for index, (_, receiver) in enumerate(self._receivers):
+            if receiver is delivery_target:
+                del self._receivers[index]
+                break
 
     def register_msg_type(
         self, msg_type: str

@@ -11,7 +11,7 @@ from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-04T22:54:37+00:00"
+__date__ = "2026-08-18T19:45:50+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -86,6 +86,8 @@ class AsyncBrokerTransportSessionRunner:
         except Exception as error:
             self._error = error
             self._stop_requested = True
+        finally:
+            self._session.close()
 
     def request_stop(self) -> None:
         self._stop_requested = True

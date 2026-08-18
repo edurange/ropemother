@@ -36,7 +36,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T19:02:37+00:00"
+__date__ = "2026-08-18T19:37:48+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -47,6 +47,7 @@ class BrokerTransportSession:
     _channel: FrameChannel
     _core: DirectBrokerCore
     _state: TransportSessionState
+    _delivery_targets: list[BrokerDeliveryTarget]
 
     def __init__(
         self, *, channel: FrameChannel, core: DirectBrokerCore
@@ -54,6 +55,12 @@ class BrokerTransportSession:
         self._channel = channel
         self._core = core
         self._state = TransportSessionState()
+        self._delivery_targets = []
+
+    def close(self) -> None:
+        for delivery_target in self._delivery_targets:
+            self._core.remove_receiver(delivery_target=delivery_target)
+        self._delivery_targets.clear()
 
     def handle_next_frame(self) -> None:
         frame = self._channel.receive_frame()
@@ -173,6 +180,7 @@ class BrokerTransportSession:
         delivery_target = _TransportDeliveryTarget(
             session=self, subscription_id=subscription_id
         )
+        self._delivery_targets.append(delivery_target)
         self._core.add_receiver(
             subscription=binding.subscription, delivery_target=delivery_target
         )

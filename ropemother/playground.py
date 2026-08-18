@@ -156,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T23:00:15+00:00"
+__date__ = "2026-08-18T19:46:59+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev6"
 __status__ = "Development"
@@ -7549,6 +7549,75 @@ async def demo_async_request_clients_keep_replies_separate() -> None:
     print("\n")
 
 
+def demo_delivery_ignores_disconnected_transport_subscription() -> None:
+    print("Demo: delivery ignores disconnected transport subscription")
+    bus = DirectMessageBus(capture_sink=InMemoryCaptureSink())
+    format_registry = PortableFormatRegistry(RAW_BYTES_PORTABLE_FORMAT)
+
+    disconnected_connections = SocketFrameConnection.make_pair()
+    disconnected_client, disconnected_session = _make_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=disconnected_connections,
+    )
+    disconnected_runner = BrokerTransportSessionRunner(
+        session=disconnected_session,
+        close_connection=disconnected_connections[1].close,
+    )
+    disconnected_runner.start()
+    disconnected_client.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    disconnected_client.close()
+    disconnected_runner.join()
+
+    active_connections = SocketFrameConnection.make_pair()
+    active_client, active_session = _make_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=active_connections,
+    )
+    active_runner = BrokerTransportSessionRunner(
+        session=active_session,
+        close_connection=active_connections[1].close,
+    )
+    active_runner.start()
+    receiver = active_client.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+        payload_format=RAW_BYTES_PORTABLE_FORMAT,
+    )
+    canonical_bytes = b"foo"
+
+    emitter.emit(canonical_bytes)
+    received_bytes = receiver.receive().payload
+    active_client.close()
+    active_runner.join()
+
+    print(f"{canonical_bytes=}")
+    print(f"{received_bytes=}")
+    success = received_bytes == canonical_bytes
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received_bytes " + eq_string + " canonical_bytes")
+
+    print(f"({type(active_client).__name__}): ", end="")
+    if success:
+        print("Disconnected subscription did not interfere with delivery")
+    else:
+        print("Disconnected subscription interfered with later delivery")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7658,6 +7727,7 @@ def run_all_demos() -> None:
     demo_history_select_all_follows_cursors()
     demo_request_clients_keep_replies_separate()
     asyncio.run(demo_async_request_clients_keep_replies_separate())
+    demo_delivery_ignores_disconnected_transport_subscription()
 
 
 if __name__ == "__main__":
