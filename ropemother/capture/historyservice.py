@@ -46,7 +46,7 @@ __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
 __date__ = "2026-08-13T18:46:20+00:00"
 __license__ = "MIT"
-__version__ = "0.1.0.dev6"
+__version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 

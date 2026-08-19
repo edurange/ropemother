@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ropemother"
-version = "0.1.0.dev6"
+version = "0.1.0.dev7"
 description = "A module for publish-subscribe broadcast messaging."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -19,14 +19,23 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
+zmq = [
+    "pyzmq",
+]
 test = [
     "pytest",
 ]
 dev = [
     "black",
+    "build",
     "pylint",
     "pytest",
+    "pyzmq",
 ]
+
+[project.urls]
+Source = "https://github.com/edurange/ropemother"
+Issues = "https://github.com/edurange/ropemother/issues"
 
 [tool.black]
 line-length = 79

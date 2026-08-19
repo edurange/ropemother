@@ -6,6 +6,22 @@ The direct broker is useful for local development, teaching, demos, and early in
 
 This preview does not claim to provide distributed consensus, production broker deployment, complete replay orchestration, or archive-level storage integration. It focuses on the local message model, capture behavior, request/reply helpers, and readable examples that can be used while the broader service architecture is still taking shape.
 
+## Installation
+
+`ropemother` requires Python 3.13 or newer.
+
+Install the current developer release from PyPI with:
+
+```sh
+python -m pip install --pre ropemother
+```
+
+The base package has no required third-party runtime dependencies. The exploratory ZeroMQ transport is available as an optional extra:
+
+```sh
+python -m pip install --pre "ropemother[zmq]"
+```
+
 ## Using the source checkout
 
 Clone the repository into a workspace directory:
@@ -13,6 +29,12 @@ Clone the repository into a workspace directory:
 ```sh
 git clone https://github.com/edurange/ropemother.git
 cd ropemother
+```
+
+Install the development dependencies into the current environment:
+
+```sh
+python -m pip install -e ".[dev]"
 ```
 
 Run preview commands from the repository root:
