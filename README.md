@@ -431,3 +431,7 @@ The playground is a preview-era teaching and validation file. Over time, smaller
 The preview does not claim to provide a production distributed broker, consensus ordering, complete replay orchestration, or final transport infrastructure.
 
 The direct broker is useful for local development and early integration work. Code that uses `register_emitter(...)`, `subscribe(...)`, `emit(...)`, `receive()`, request/reply clients, and history clients should remain close to the intended public workflow as stronger transport and persistence pieces are added.
+
+## License
+
+`ropemother` is released under the MIT License. See LICENSE for details.
