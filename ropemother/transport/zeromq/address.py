@@ -3,19 +3,19 @@
 
 """ZMQ transport address value objects."""
 
-from dataclasses import dataclass
+import dataclasses
 
 from ropemother.util.symbol import Symbol
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-02T20:19:07+00:00"
+__date__ = "2026-08-20T18:22:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class ZMQAddress(Symbol):
     """ZeroMQ endpoint address used by frame connections."""
     @classmethod

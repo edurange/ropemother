@@ -33,7 +33,7 @@ from ropemother.util.onelinejson import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-21T21:57:47+00:00"
+__date__ = "2026-08-20T17:42:50+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -65,7 +65,7 @@ class ScriptedInputEvent:
     msg_type: str
     msg_producer: str
     payload: Any
-    payload_format: PortableFormat[Any, Any]
+    payload_format: PortableFormat
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -78,7 +78,7 @@ class ScriptedInputPlan:
         cls,
         path: str | Path,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
     ) -> "ScriptedInputPlan":
         source_path = Path(path)
         text = source_path.read_text(encoding="utf-8")
@@ -89,7 +89,7 @@ class ScriptedInputPlan:
         cls,
         text: str,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
     ) -> "ScriptedInputPlan":
         format_registry = default_portable_format_registry(
             extra_formats=extra_formats
@@ -114,7 +114,7 @@ class ScriptedInputPlan:
         cls,
         records: Iterable[JSONRecord],
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
     ) -> "ScriptedInputPlan":
         format_registry = default_portable_format_registry(
             extra_formats=extra_formats
@@ -318,7 +318,7 @@ def _format_key_from_string(value: str) -> PortableFormatKey:
 def _payload_from_record(
     record: JSONRecord,
     *,
-    payload_format: PortableFormat[Any, Any],
+    payload_format: PortableFormat,
 ) -> Any:
     if "payload_base64" in record:
         payload = _bytes_from_base64(record["payload_base64"])
@@ -336,7 +336,7 @@ def _payload_from_record(
 def _payload_text_value(
     value: JSONValue,
     *,
-    payload_format: PortableFormat[Any, Any],
+    payload_format: PortableFormat,
 ) -> str | bytes:
     if not isinstance(value, str):
         raise InvalidScriptedInputRecordError(

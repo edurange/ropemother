@@ -3,8 +3,6 @@
 
 """Broker-side protocol session for one transport connection."""
 
-from typing import Any
-
 from ropemother.broker.directcore import BrokerDeliveryTarget, DirectBrokerCore
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.formattable import UnknownPortableFormatError
@@ -36,7 +34,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-18T19:37:48+00:00"
+__date__ = "2026-08-20T17:43:01+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -264,7 +262,7 @@ class BrokerTransportSession:
 
     def _supported_type_formats_from_frame(
         self, frame: RegisterEmitterFrame
-    ) -> dict[str, tuple[PortableFormat[Any, Any], ...]]:
+    ) -> dict[str, tuple[PortableFormat, ...]]:
         supported_type_formats = {}
         for support in frame.supported_type_formats:
             formats = tuple(

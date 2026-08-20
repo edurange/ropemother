@@ -44,7 +44,7 @@ from ropemother.util.compositeblobserializer import CompositeRecord
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T18:46:20+00:00"
+__date__ = "2026-08-20T17:42:09+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -72,17 +72,17 @@ class InvalidMessageHistoryRecordError(
 class HistoryClient:
     """Request/reply client for querying captured message history."""
     _client: RequestClient
-    _selection_format: PortableFormat[Any, Any]
-    _page_format: PortableFormat[Any, Any]
+    _selection_format: PortableFormat
+    _page_format: PortableFormat
     _format_registry: PortableFormatTable
 
     def __init__(
         self,
         client: RequestClient,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-        selection_format: PortableFormat[Any, Any] | None = None,
-        page_format: PortableFormat[Any, Any] | None = None,
+        extra_formats: Iterable[PortableFormat] = (),
+        selection_format: PortableFormat | None = None,
+        page_format: PortableFormat | None = None,
     ) -> None:
         format_registry = default_portable_format_registry(
             extra_formats=extra_formats
@@ -183,11 +183,11 @@ class HistoryClient:
         return tuple(entries)
 
     @property
-    def request_format(self) -> PortableFormat[Any, Any]:
+    def request_format(self) -> PortableFormat:
         return self._selection_format
 
     @property
-    def reply_format(self) -> PortableFormat[Any, Any]:
+    def reply_format(self) -> PortableFormat:
         return self._page_format
 
     def _initialize(
@@ -195,8 +195,8 @@ class HistoryClient:
         client: RequestClient,
         *,
         format_registry: PortableFormatTable,
-        selection_format: PortableFormat[Any, Any] | None,
-        page_format: PortableFormat[Any, Any] | None,
+        selection_format: PortableFormat | None,
+        page_format: PortableFormat | None,
     ) -> None:
         if selection_format is None:
             selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
@@ -213,8 +213,8 @@ class HistoryClient:
         client: RequestClient,
         *,
         format_registry: PortableFormatTable,
-        selection_format: PortableFormat[Any, Any] | None = None,
-        page_format: PortableFormat[Any, Any] | None = None,
+        selection_format: PortableFormat | None = None,
+        page_format: PortableFormat | None = None,
     ) -> "HistoryClient":
         history_client = cls.__new__(cls)
         history_client._initialize(
@@ -230,14 +230,14 @@ class HistoryService:
     """Request/reply service that answers message history queries."""
     _history: MessageHistory
     _service: RequestService
-    _page_format: PortableFormat[Any, Any]
+    _page_format: PortableFormat
 
     def __init__(
         self,
         history: MessageHistory,
         service: RequestService,
         *,
-        page_format: PortableFormat[Any, Any] | None = None,
+        page_format: PortableFormat | None = None,
     ) -> None:
         if page_format is None:
             page_format = DEFAULT_HISTORY_PAGE_FORMAT
@@ -287,17 +287,17 @@ class HistoryService:
 class AsyncHistoryClient:
     """Async request/reply client for querying captured message history."""
     _client: AsyncRequestClient
-    _selection_format: PortableFormat[Any, Any]
-    _page_format: PortableFormat[Any, Any]
+    _selection_format: PortableFormat
+    _page_format: PortableFormat
     _format_registry: PortableFormatTable
 
     def __init__(
         self,
         client: AsyncRequestClient,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-        selection_format: PortableFormat[Any, Any] | None = None,
-        page_format: PortableFormat[Any, Any] | None = None,
+        extra_formats: Iterable[PortableFormat] = (),
+        selection_format: PortableFormat | None = None,
+        page_format: PortableFormat | None = None,
     ) -> None:
         format_registry = default_portable_format_registry(
             extra_formats=extra_formats
@@ -398,11 +398,11 @@ class AsyncHistoryClient:
         return tuple(entries)
 
     @property
-    def request_format(self) -> PortableFormat[Any, Any]:
+    def request_format(self) -> PortableFormat:
         return self._selection_format
 
     @property
-    def reply_format(self) -> PortableFormat[Any, Any]:
+    def reply_format(self) -> PortableFormat:
         return self._page_format
 
     def _initialize(
@@ -410,8 +410,8 @@ class AsyncHistoryClient:
         client: AsyncRequestClient,
         *,
         format_registry: PortableFormatTable,
-        selection_format: PortableFormat[Any, Any] | None,
-        page_format: PortableFormat[Any, Any] | None,
+        selection_format: PortableFormat | None,
+        page_format: PortableFormat | None,
     ) -> None:
         if selection_format is None:
             selection_format = DEFAULT_HISTORY_SELECTION_FORMAT
@@ -428,8 +428,8 @@ class AsyncHistoryClient:
         client: AsyncRequestClient,
         *,
         format_registry: PortableFormatTable,
-        selection_format: PortableFormat[Any, Any] | None = None,
-        page_format: PortableFormat[Any, Any] | None = None,
+        selection_format: PortableFormat | None = None,
+        page_format: PortableFormat | None = None,
     ) -> "AsyncHistoryClient":
         history_client = cls.__new__(cls)
         history_client._initialize(
@@ -445,14 +445,14 @@ class AsyncHistoryService:
     """Async request/reply service that answers message history queries."""
     _history: MessageHistory
     _service: AsyncRequestService
-    _page_format: PortableFormat[Any, Any]
+    _page_format: PortableFormat
 
     def __init__(
         self,
         history: MessageHistory,
         service: AsyncRequestService,
         *,
-        page_format: PortableFormat[Any, Any] | None = None,
+        page_format: PortableFormat | None = None,
     ) -> None:
         if page_format is None:
             page_format = DEFAULT_HISTORY_PAGE_FORMAT

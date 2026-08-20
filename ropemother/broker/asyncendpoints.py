@@ -28,7 +28,7 @@ class AsyncEmitter(abc.ABC):
         payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         ...
 
@@ -39,7 +39,7 @@ class AsyncEmitter(abc.ABC):
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> MessageID:
         ...
 
@@ -50,7 +50,7 @@ class AsyncEmitter(abc.ABC):
         payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         ...
 

@@ -30,7 +30,7 @@ from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T22:09:10+00:00"
+__date__ = "2026-08-20T17:38:34+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -65,7 +65,7 @@ class AsyncRequester:
         payload: Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> RequestHandle:
         correlation_id = CorrelationID(self._next_correlation_value)
         self._next_correlation_value += 1
@@ -186,7 +186,7 @@ class AsyncResponder:
         payload: Any,
         *,
         msg_type: str | RequestOption | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         reply_msg_type = msg_type
         if msg_type is SAME_MSG_TYPE:
@@ -226,7 +226,7 @@ class AsyncServiceRequest:
         payload: Any,
         *,
         msg_type: str | RequestOption | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         if self._replied:
             raise CompletedServiceRequestError(
@@ -301,7 +301,7 @@ class AsyncRequestClient:
         payload: Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> RequestHandle:
         self._requests.ensure_can_start()
         handle = await self._requester.request(
@@ -321,7 +321,7 @@ class AsyncRequestClient:
         payload: Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> ReceivedMessage:
         handle = await self.send(
             payload, msg_type=msg_type, payload_format=payload_format

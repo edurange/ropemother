@@ -3,8 +3,7 @@
 
 """Default portable payload formats for local ropemother runtimes."""
 
-from collections.abc import Iterable
-from typing import Any
+import collections.abc
 
 from ropemother.client.procedure import PROCEDURE_INVOCATION_JSON_FORMAT
 from ropemother.format.portableformat import (
@@ -17,13 +16,13 @@ from ropemother.format.registry import PortableFormatRegistry
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T15:55:31+00:00"
+__date__ = "2026-08-20T17:39:35+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-def default_portable_formats() -> tuple[PortableFormat[Any, Any], ...]:
+def default_portable_formats() -> tuple[PortableFormat, ...]:
     """Return portable formats installed by the base ropemother runtime."""
     formats = (
         RAW_BYTES_PORTABLE_FORMAT,
@@ -35,7 +34,7 @@ def default_portable_formats() -> tuple[PortableFormat[Any, Any], ...]:
 
 
 def default_portable_format_registry(
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
 ) -> PortableFormatRegistry:
     """Build a local format registry with default and application formats."""
     registry = PortableFormatRegistry(*default_portable_formats())

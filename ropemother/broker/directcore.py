@@ -70,7 +70,7 @@ from ropemother.message.typeformats import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-18T19:37:06+00:00"
+__date__ = "2026-08-20T17:40:36+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -160,7 +160,7 @@ class DirectBrokerCore:
     def __init__(
         self,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
         capture_enabled: bool = True,
         bootstrap_enabled: bool = False,
         bootstrap_policy: BootstrapPolicy | None = None,
@@ -197,7 +197,7 @@ class DirectBrokerCore:
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> tuple[EmitterBinding, tuple[RegistrationRecord, ...]]:
         new_registrations: list[RegistrationRecord] = []
@@ -350,19 +350,17 @@ class DirectBrokerCore:
         return (msg_type_id, (registration,))
 
     def register_payload_format(
-        self, payload_format: PortableFormat[Any, Any]
+        self, payload_format: PortableFormat
     ) -> tuple[PortableFormatID, tuple[RegistrationRecord, ...]]:
         format_id = self._ensure_format_id(payload_format)
         registration = self._format_registration_for(format_id)
         return (format_id, (registration,))
 
-    def install_format(
-        self, payload_format: PortableFormat[Any, Any]
-    ) -> None:
+    def install_format(self, payload_format: PortableFormat) -> None:
         self._format_registry.install_format(payload_format)
 
     def install_formats(
-        self, payload_formats: Iterable[PortableFormat[Any, Any]]
+        self, payload_formats: Iterable[PortableFormat]
     ) -> None:
         self._format_registry.install_formats(payload_formats)
 
@@ -383,7 +381,7 @@ class DirectBrokerCore:
         binding: EmitterBinding,
         payload: Any,
         msg_type: str | None,
-        payload_format: PortableFormat[Any, Any] | None,
+        payload_format: PortableFormat | None,
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
@@ -479,7 +477,7 @@ class DirectBrokerCore:
         self,
         *,
         payload: Any,
-        msg_format: PortableFormat[Any, Any],
+        msg_format: PortableFormat,
         msg_format_id: PortableFormatID,
         msg_topic: str,
         msg_type: str,
@@ -596,7 +594,7 @@ class DirectBrokerCore:
         self,
         *,
         payload: Any,
-        msg_format: PortableFormat[Any, Any],
+        msg_format: PortableFormat,
         msg_format_id: PortableFormatID,
     ) -> SerializedPayload:
         try:
@@ -622,7 +620,7 @@ class DirectBrokerCore:
         self,
         *,
         serialized_payload: SerializedPayload,
-        msg_format: PortableFormat[Any, Any],
+        msg_format: PortableFormat,
     ) -> Any:
         try:
             payload = msg_format.decode(serialized_payload.payload_bytes)
@@ -672,7 +670,7 @@ class DirectBrokerCore:
 
     def _ensure_format_id(
         self,
-        payload_format: PortableFormat[Any, Any],
+        payload_format: PortableFormat,
         *,
         registrations: list[RegistrationRecord] | None = None,
     ) -> PortableFormatID:
@@ -690,7 +688,7 @@ class DirectBrokerCore:
         *,
         binding: EmitterBinding,
         msg_type: str,
-        payload_format: PortableFormat[Any, Any],
+        payload_format: PortableFormat,
     ) -> None:
         if binding.format_policy.supports(
             msg_type=msg_type, payload_format=payload_format
@@ -706,7 +704,7 @@ class DirectBrokerCore:
         self,
         *,
         binding: EmitterBinding,
-        payload_format: PortableFormat[Any, Any],
+        payload_format: PortableFormat,
     ) -> PortableFormatID:
         format_id = binding.format_ids.get(payload_format.key)
         if format_id is not None:

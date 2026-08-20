@@ -3,9 +3,8 @@
 
 """Compact IDs and registration helpers for payload formats."""
 
-from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Any
+import collections.abc
+import dataclasses
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat, PortableFormatKey
@@ -17,7 +16,7 @@ from ropemother.format.formattable import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T07:15:10+00:00"
+__date__ = "2026-08-20T17:42:21+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -55,7 +54,7 @@ class ConflictingPortableFormatRegistrationError(
     pass
 
 
-@dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True, slots=True)
 class PortableFormatID:
     """Compact captured identifier for a portable payload format."""
     value: int
@@ -75,7 +74,7 @@ class PortableFormatID:
             )
 
 
-@dataclass(frozen=True, kw_only=True, slots=True)
+@dataclasses.dataclass(frozen=True, kw_only=True, slots=True)
 class PortableFormatRegistration:
     """Captured binding from a compact format ID to a format key."""
     format_id: PortableFormatID
@@ -87,11 +86,9 @@ class PortableFormatRegistry(PortableFormatTable):
     _format_ids: dict[PortableFormatKey, PortableFormatID]
     _format_keys: dict[PortableFormatID, PortableFormatKey]
     _registrations: list[PortableFormatRegistration]
-    _local_formats: dict[PortableFormatKey, PortableFormat[Any, Any]]
+    _local_formats: dict[PortableFormatKey, PortableFormat]
 
-    def __init__(
-        self, *formats: PortableFormat[Any, Any]
-    ) -> None:
+    def __init__(self, *formats: PortableFormat) -> None:
         self._format_ids = {}
         self._format_keys = {}
         self._registrations = []
@@ -99,14 +96,12 @@ class PortableFormatRegistry(PortableFormatTable):
         self.install_formats(formats)
 
     def install_formats(
-        self, formats: Iterable[PortableFormat[Any, Any]]
+        self, formats: collections.abc.Iterable[PortableFormat]
     ) -> None:
         for portable_format in formats:
             self.install_format(portable_format)
 
-    def install_format(
-        self, portable_format: PortableFormat[Any, Any]
-    ) -> None:
+    def install_format(self, portable_format: PortableFormat) -> None:
         existing_format = self._local_formats.get(portable_format.key)
         if existing_format is not None:
             self._ensure_compatible_format(existing_format, portable_format)
@@ -114,7 +109,7 @@ class PortableFormatRegistry(PortableFormatTable):
             self._local_formats[portable_format.key] = portable_format
 
     def ensure_format_id(
-        self, portable_format: PortableFormat[Any, Any]
+        self, portable_format: PortableFormat
     ) -> tuple[PortableFormatID, PortableFormatRegistration | None]:
         format_key = portable_format.key
         self.install_format(portable_format)
@@ -137,7 +132,7 @@ class PortableFormatRegistry(PortableFormatTable):
     def format_keys(self) -> tuple[PortableFormatKey, ...]:
         return tuple(self._local_formats)
 
-    def formats(self) -> tuple[PortableFormat[Any, Any], ...]:
+    def formats(self) -> tuple[PortableFormat, ...]:
         return tuple(self._local_formats.values())
 
     def registrations(self) -> tuple[PortableFormatRegistration, ...]:
@@ -181,15 +176,11 @@ class PortableFormatRegistry(PortableFormatTable):
     ) -> PortableFormatID | None:
         return self._format_ids.get(format_key)
 
-    def format_for_id(
-        self, format_id: PortableFormatID
-    ) -> PortableFormat[Any, Any]:
+    def format_for_id(self, format_id: PortableFormatID) -> PortableFormat:
         format_key = self.format_key_for_id(format_id)
         return self.from_key(format_key)
 
-    def from_key(
-        self, key: PortableFormatKey
-    ) -> PortableFormat[Any, Any]:
+    def from_key(self, key: PortableFormatKey) -> PortableFormat:
         try:
             portable_format = self._local_formats[key]
         except KeyError as e:
@@ -200,8 +191,8 @@ class PortableFormatRegistry(PortableFormatTable):
 
     def _ensure_compatible_format(
         self,
-        existing_format: PortableFormat[Any, Any],
-        portable_format: PortableFormat[Any, Any],
+        existing_format: PortableFormat,
+        portable_format: PortableFormat,
     ) -> None:
         if existing_format != portable_format:
             raise ConflictingPortableFormatError(

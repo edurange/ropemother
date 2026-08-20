@@ -3,9 +3,8 @@
 
 """Environment-variable handoff for message bus contact details."""
 
-from collections.abc import Iterable, Mapping, MutableMapping
+import collections.abc
 import os
-from typing import Any
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat
@@ -19,7 +18,7 @@ from ropemother.transport.client import TransportClient
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:41:15+00:00"
+__date__ = "2026-08-20T17:41:08+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -41,7 +40,7 @@ class MissingBusContactEnvironmentError(KeyError, BusContactEnvironmentError):
 def set_bus_contact_uri(
     descriptor: ConnectionDescriptor,
     *,
-    variables: MutableMapping[str, str] | None = None,
+    variables: collections.abc.MutableMapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> None:
     """Store a bus contact URI in an environment mapping."""
@@ -55,7 +54,7 @@ def set_bus_contact_uri(
 def bus_contact_variables(
     descriptor: ConnectionDescriptor,
     *,
-    variables: Mapping[str, str] | None = None,
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> dict[str, str]:
     """Return environment variables with a bus contact URI added."""
@@ -70,7 +69,7 @@ def bus_contact_variables(
 
 def bus_contact_descriptor(
     *,
-    variables: Mapping[str, str] | None = None,
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> ConnectionDescriptor:
     """Read a bus connection descriptor from environment variables."""
@@ -90,8 +89,8 @@ def bus_contact_descriptor(
 
 def connect_client_from_bus_contact(
     *,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-    variables: Mapping[str, str] | None = None,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> TransportClient:
     """Connect to the bus named by environment variables."""
@@ -105,8 +104,8 @@ def connect_client_from_bus_contact(
 def connect_message_bus(
     descriptor: ConnectionDescriptor | str | None = None,
     *,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-    variables: Mapping[str, str] | None = None,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> TransportClient:
     """Connect to a message bus from a descriptor or environment."""
@@ -127,8 +126,8 @@ def connect_message_bus(
 
 async def connect_async_client_from_bus_contact(
     *,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-    variables: Mapping[str, str] | None = None,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> AsyncTransportClient:
     """Connect asynchronously to the bus named by environment variables."""
@@ -142,8 +141,8 @@ async def connect_async_client_from_bus_contact(
 async def connect_async_message_bus(
     descriptor: ConnectionDescriptor | str | None = None,
     *,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
-    variables: Mapping[str, str] | None = None,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
+    variables: collections.abc.Mapping[str, str] | None = None,
     name: str = BUS_CONTACT_URI_VARIABLE,
 ) -> AsyncTransportClient:
     """Connect asynchronously to a message bus using a URI descriptor."""

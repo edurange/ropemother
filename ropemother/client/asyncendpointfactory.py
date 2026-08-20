@@ -3,8 +3,6 @@
 
 """Asynchronous factory helpers for bus endpoints and clients."""
 
-from typing import Any
-
 from ropemother.bootstrap.policy import (
     DEFAULT_LIFECYCLE_TOPIC_ROOT,
     LifecycleMessageType,
@@ -34,7 +32,7 @@ from ropemother.format.portableformat import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:07:02+00:00"
+__date__ = "2026-08-20T17:38:11+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -103,8 +101,8 @@ class AsyncMessageEndpointFactory(
     def _make_history_client(
         self,
         request_client: AsyncRequestClient,
-        selection_format: PortableFormat[Any, Any],
-        page_format: PortableFormat[Any, Any],
+        selection_format: PortableFormat,
+        page_format: PortableFormat,
     ) -> AsyncHistoryClient:
         format_table = self._portable_format_table()
         history_client = AsyncHistoryClient._from_format_registry(
@@ -119,7 +117,7 @@ class AsyncMessageEndpointFactory(
         self,
         history: MessageHistory,
         request_service: AsyncRequestService,
-        page_format: PortableFormat[Any, Any],
+        page_format: PortableFormat,
     ) -> AsyncHistoryService:
         history_service = AsyncHistoryService(
             history, request_service, page_format=page_format

@@ -3,8 +3,8 @@
 
 """Shared endpoint factory support for client-facing helpers."""
 
-from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+import abc
+import typing
 
 from ropemother.capture.history import MessageHistory
 from ropemother.client.procedure import PROCEDURE_INVOCATION_JSON_FORMAT
@@ -24,28 +24,28 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:21:40+00:00"
+__date__ = "2026-08-20T17:41:00+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-EmitterT = TypeVar("EmitterT")
-ReceiverT = TypeVar("ReceiverT")
-RequesterT = TypeVar("RequesterT")
-ResponderT = TypeVar("ResponderT")
-RequestClientT = TypeVar("RequestClientT")
-RequestServiceT = TypeVar("RequestServiceT")
-HistoryClientT = TypeVar("HistoryClientT")
-HistoryServiceT = TypeVar("HistoryServiceT")
-ProcedureClientT = TypeVar("ProcedureClientT")
-ProcedureServiceT = TypeVar("ProcedureServiceT")
-ProcedureHandlerT = TypeVar("ProcedureHandlerT")
+EmitterT = typing.TypeVar("EmitterT")
+ReceiverT = typing.TypeVar("ReceiverT")
+RequesterT = typing.TypeVar("RequesterT")
+ResponderT = typing.TypeVar("ResponderT")
+RequestClientT = typing.TypeVar("RequestClientT")
+RequestServiceT = typing.TypeVar("RequestServiceT")
+HistoryClientT = typing.TypeVar("HistoryClientT")
+HistoryServiceT = typing.TypeVar("HistoryServiceT")
+ProcedureClientT = typing.TypeVar("ProcedureClientT")
+ProcedureServiceT = typing.TypeVar("ProcedureServiceT")
+ProcedureHandlerT = typing.TypeVar("ProcedureHandlerT")
 
 
 class EndpointFactoryBase(
-    ABC,
-    Generic[
+    abc.ABC,
+    typing.Generic[
         EmitterT,
         ReceiverT,
         RequesterT,
@@ -60,7 +60,7 @@ class EndpointFactoryBase(
     ],
 ):
     """Shared factory logic for endpoint and request/reply helpers."""
-    @abstractmethod
+    @abc.abstractmethod
     def register_emitter(
         self,
         *,
@@ -69,12 +69,12 @@ class EndpointFactoryBase(
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> EmitterT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def subscribe(
         self,
         *,
@@ -84,7 +84,7 @@ class EndpointFactoryBase(
     ) -> ReceiverT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_requester(
         self,
         request_emitter: EmitterT,
@@ -93,11 +93,11 @@ class EndpointFactoryBase(
     ) -> RequesterT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _portable_format_table(self) -> PortableFormatTable:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_responder(
         self,
         reply_emitter: EmitterT,
@@ -105,7 +105,7 @@ class EndpointFactoryBase(
     ) -> ResponderT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_request_client(
         self,
         requester: RequesterT,
@@ -113,38 +113,38 @@ class EndpointFactoryBase(
     ) -> RequestClientT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_request_service(
         self,
         responder: ResponderT,
     ) -> RequestServiceT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_history_client(
         self,
         request_client: RequestClientT,
-        selection_format: PortableFormat[Any, Any],
-        page_format: PortableFormat[Any, Any],
+        selection_format: PortableFormat,
+        page_format: PortableFormat,
     ) -> HistoryClientT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_history_service(
         self,
         history: MessageHistory,
         request_service: RequestServiceT,
-        page_format: PortableFormat[Any, Any]
+        page_format: PortableFormat
     ) -> HistoryServiceT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_procedure_client(
         self, request_client: RequestClientT
     ) -> ProcedureClientT:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _make_procedure_service(
         self, request_service: RequestServiceT, handler: ProcedureHandlerT
     ) -> ProcedureServiceT:
@@ -159,7 +159,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -191,7 +191,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> ResponderT:
         request_receiver = self.subscribe(
@@ -217,7 +217,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -245,7 +245,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> RequestServiceT:
         responder = self.create_responder(
@@ -269,10 +269,10 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
-        reply_payload_format: PortableFormat[Any, Any] = (
+        reply_payload_format: PortableFormat = (
             COMPOSITE_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -304,7 +304,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = (
+        reply_payload_format: PortableFormat = (
             COMPOSITE_PORTABLE_FORMAT
         ),
         reply_type_formats: SupportedTypeFormatsInput | None = None,
@@ -333,7 +333,7 @@ class EndpointFactoryBase(
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        procedure_invocation_format: PortableFormat[Any, Any] = (
+        procedure_invocation_format: PortableFormat = (
             PROCEDURE_INVOCATION_JSON_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -362,7 +362,7 @@ class EndpointFactoryBase(
         request_msg_type: str,
         reply_msg_type: str,
         handler: ProcedureHandlerT,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> ProcedureServiceT:
         request_service = self.create_request_service(

@@ -3,9 +3,8 @@
 
 """Client-side connection helpers for freestanding message bus services."""
 
-from collections.abc import Iterable
+import collections.abc
 import socket
-from typing import Any
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat
@@ -22,7 +21,7 @@ from ropemother.transport.socketconnection import SocketFrameConnection
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:39:17+00:00"
+__date__ = "2026-08-20T17:39:19+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -58,7 +57,7 @@ def connect_frame_connection(
 def connect_transport_client(
     *,
     descriptor: ConnectionDescriptor,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
 ) -> TransportClient:
     """Open a transport client for a described message bus service."""
     connection = connect_frame_connection(descriptor)
@@ -84,7 +83,7 @@ async def connect_async_frame_connection(
 async def connect_async_transport_client(
     *,
     descriptor: ConnectionDescriptor,
-    extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
 ) -> AsyncTransportClient:
     """Open an async transport client for a described message bus service."""
     connection = await connect_async_frame_connection(descriptor)

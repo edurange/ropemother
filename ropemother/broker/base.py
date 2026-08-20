@@ -3,8 +3,7 @@
 
 """Abstract interface for message bus implementation."""
 
-from abc import abstractmethod
-from typing import Any
+import abc
 
 from ropemother.broker.endpoints import Emitter, Receiver
 from ropemother.capture.sink import CaptureSink
@@ -22,7 +21,7 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T16:37:16+00:00"
+__date__ = "2026-08-20T17:38:54+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -31,7 +30,7 @@ __status__ = "Development"
 class MessageBus(MessageEndpointFactory):
     """Abstract broker interface for local message bus implementations."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def register_emitter(
         self,
         *,
@@ -40,12 +39,12 @@ class MessageBus(MessageEndpointFactory):
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> Emitter:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def subscribe(
         self,
         *,
@@ -55,6 +54,6 @@ class MessageBus(MessageEndpointFactory):
     ) -> Receiver:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def set_capture_sink(self, capture_sink: CaptureSink) -> None:
         ...

@@ -33,7 +33,7 @@ from ropemother.message.symbols import MessageTypeID, ProducerID, TopicID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T20:27:52+00:00"
+__date__ = "2026-08-20T17:41:40+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -111,7 +111,7 @@ class InMemoryCaptureHistory(MessageHistory):
         self,
         source: CaptureRecordSource,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
     ) -> None:
         format_registry = default_portable_format_registry(
             extra_formats=extra_formats

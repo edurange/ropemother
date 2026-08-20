@@ -49,7 +49,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T18:51:23+00:00"
+__date__ = "2026-08-20T17:40:25+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -62,7 +62,7 @@ class DirectMessageBus(MessageBus):
     def __init__(
         self,
         *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: Iterable[PortableFormat] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
     ) -> None:
@@ -84,7 +84,7 @@ class DirectMessageBus(MessageBus):
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> Emitter:
         binding, _ = self._core.bind_emitter(
@@ -118,13 +118,11 @@ class DirectMessageBus(MessageBus):
         )
         return receiver
 
-    def install_format(
-        self, payload_format: PortableFormat[Any, Any]
-    ) -> None:
+    def install_format(self, payload_format: PortableFormat) -> None:
         self._core.install_format(payload_format)
 
     def install_formats(
-        self, payload_formats: Iterable[PortableFormat[Any, Any]]
+        self, payload_formats: Iterable[PortableFormat]
     ) -> None:
         self._core.install_formats(payload_formats)
 
@@ -180,7 +178,7 @@ class _BrokerEmitter(Emitter):
         payload: Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         self._core.emit_from(
             binding=self._binding,
@@ -196,7 +194,7 @@ class _BrokerEmitter(Emitter):
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> MessageID:
         request_id = self._core.emit_from(
             binding=self._binding,
@@ -214,7 +212,7 @@ class _BrokerEmitter(Emitter):
         payload: Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         correlation_id, reply_to = reply_metadata_for(request)
         self._core.emit_from(

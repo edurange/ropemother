@@ -4,8 +4,8 @@
 """Asynchronous endpoint-side client facade for ropemother transport frames."""
 
 from collections import deque
-from collections.abc import Iterable
-from typing import Any
+import collections.abc
+import typing
 
 from ropemother.broker.asyncendpoints import AsyncEmitter, AsyncReceiver
 from ropemother.broker.endpoints import (
@@ -64,7 +64,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T19:39:49+00:00"
+__date__ = "2026-08-20T18:24:54+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -83,7 +83,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         self,
         *,
         channel: AsyncFrameChannel,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: collections.abc.Iterable[PortableFormat] = (),
     ) -> None:
         self._channel = channel
         self._delivery_queues = {}
@@ -103,7 +103,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> "AsyncTransportEmitter":
         additional_types = normalize_symbol_collection_input(
@@ -295,7 +295,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         return delivery_frame
 
     def _handle_delivery_candidate(
-        self, frame: Any, subscription_id: TransportSubscriptionID
+        self, frame: typing.Any, subscription_id: TransportSubscriptionID
     ) -> DeliveryFrame | None:
         delivery_frame = None
         if isinstance(frame, TransportErrorFrame):
@@ -406,10 +406,10 @@ class AsyncTransportEmitter(AsyncEmitter):
 
     async def emit(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         await self._emit_frame(
             payload=payload,
@@ -421,11 +421,11 @@ class AsyncTransportEmitter(AsyncEmitter):
 
     async def emit_request(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> MessageID:
         await self._emit_frame(
             payload=payload,
@@ -440,10 +440,10 @@ class AsyncTransportEmitter(AsyncEmitter):
     async def emit_reply(
         self,
         request: ReceivedMessage,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[Any, Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         correlation_id, reply_to = reply_metadata_for(request)
         await self._emit_frame(
@@ -459,9 +459,9 @@ class AsyncTransportEmitter(AsyncEmitter):
     async def _emit_frame(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         msg_type: str | None,
-        payload_format: PortableFormat[Any, Any] | None,
+        payload_format: PortableFormat | None,
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
@@ -517,7 +517,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         self,
         *,
         msg_type: str,
-        payload_format: PortableFormat[Any, Any],
+        payload_format: PortableFormat,
     ) -> None:
         if self._format_policy.supports(
             msg_type=msg_type, payload_format=payload_format
@@ -530,7 +530,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         )
 
     async def _format_id_for_emit(
-        self, payload_format: PortableFormat[Any, Any]
+        self, payload_format: PortableFormat
     ) -> PortableFormatID:
         format_id = self._registrations.find_format_id_for(
             payload_format.key
@@ -547,7 +547,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         return response.format_id
 
     def _serialize_payload(
-        self, payload: Any, payload_format: PortableFormat[Any, Any]
+        self, payload: typing.Any, payload_format: PortableFormat
     ) -> bytes:
         try:
             payload_bytes = payload_format.encode(payload)

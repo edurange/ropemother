@@ -3,9 +3,9 @@
 
 """Message type to payload format support helpers."""
 
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, TypeAlias
+import collections.abc
+import dataclasses
+import typing
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.portableformat import PortableFormat
@@ -17,18 +17,18 @@ from ropemother.message.symbols import validate_msg_type
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-07T01:06:41+00:00"
+__date__ = "2026-08-20T17:43:14+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-SupportedFormatInput: TypeAlias = (
-    PortableFormat[Any, Any]
-    | tuple[PortableFormat[Any, Any], ...]
-    | list[PortableFormat[Any, Any]]
+SupportedFormatInput: typing.TypeAlias = (
+    PortableFormat | tuple[PortableFormat, ...] | list[PortableFormat]
 )
-SupportedTypeFormatsInput: TypeAlias = Mapping[str, SupportedFormatInput]
+SupportedTypeFormatsInput: typing.TypeAlias = collections.abc.Mapping[
+    str, SupportedFormatInput
+]
 
 
 class TypeFormatSupportError(MessageBusBaseException):
@@ -46,20 +46,20 @@ class InvalidTypeFormatSupportTypeError(TypeError, TypeFormatSupportError):
     pass
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class TypeFormatSupport:
     """Portable payload formats supported by one message type."""
-    default_format: PortableFormat[Any, Any]
-    supported_formats: tuple[PortableFormat[Any, Any], ...]
+    default_format: PortableFormat
+    supported_formats: tuple[PortableFormat, ...]
 
-    def supports(self, payload_format: PortableFormat[Any, Any]) -> bool:
+    def supports(self, payload_format: PortableFormat) -> bool:
         for supported_format in self.supported_formats:
             if supported_format.key == payload_format.key:
                 return True
         return False
 
     def with_format(
-        self, payload_format: PortableFormat[Any, Any]
+        self, payload_format: PortableFormat
     ) -> "TypeFormatSupport":
         if self.supports(payload_format):
             return self
@@ -72,11 +72,11 @@ class TypeFormatSupport:
         return support
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class TypeFormatPolicy:
     """Policy for resolving message types and portable payload formats."""
     default_msg_type: str
-    default_payload_format: PortableFormat[Any, Any]
+    default_payload_format: PortableFormat
     supported_type_formats: dict[str, TypeFormatSupport]
     allow_unlisted_type_formats: bool
 
@@ -93,8 +93,8 @@ class TypeFormatPolicy:
         self,
         *,
         msg_type: str,
-        payload_format: PortableFormat[Any, Any] | None,
-    ) -> PortableFormat[Any, Any]:
+        payload_format: PortableFormat | None,
+    ) -> PortableFormat:
         if payload_format is not None:
             return payload_format
 
@@ -105,7 +105,7 @@ class TypeFormatPolicy:
         return self.default_payload_format
 
     def supports(
-        self, *, msg_type: str, payload_format: PortableFormat[Any, Any]
+        self, *, msg_type: str, payload_format: PortableFormat
     ) -> bool:
         support = self.supported_type_formats.get(msg_type)
 
@@ -121,7 +121,7 @@ class TypeFormatPolicy:
 def normalize_type_format_policy(
     *,
     msg_type: str,
-    payload_format: PortableFormat[Any, Any],
+    payload_format: PortableFormat,
     additional_msg_types: SymbolCollectionInput = (),
     supported_type_formats: SupportedTypeFormatsInput | None = None,
     allow_unlisted_type_formats: bool = False,
@@ -159,7 +159,7 @@ def _support_map_from_input(
     if supported_type_formats is None:
         return supported
 
-    if not isinstance(supported_type_formats, Mapping):
+    if not isinstance(supported_type_formats, collections.abc.Mapping):
         value_type = type(supported_type_formats).__name__
         raise InvalidTypeFormatSupportTypeError(
             "supported_type_formats must be a mapping, got " f"{value_type}"
@@ -185,8 +185,8 @@ def _support_from_format_input(
 
 
 def _format_tuple_from_input(
-    formats: SupportedFormatInput,
-) -> tuple[PortableFormat[Any, Any], ...]:
+    formats: SupportedFormatInput
+) -> tuple[PortableFormat, ...]:
     if isinstance(formats, PortableFormat):
         return (formats,)
 
@@ -225,7 +225,7 @@ def _ensure_supported_format(
     supported: dict[str, TypeFormatSupport],
     *,
     msg_type: str,
-    payload_format: PortableFormat[Any, Any],
+    payload_format: PortableFormat,
 ) -> None:
     validate_msg_type(msg_type)
     support = supported.get(msg_type)

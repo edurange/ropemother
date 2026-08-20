@@ -3,8 +3,6 @@
 
 """Synchronous factory helpers for bus endpoints and request/reply clients."""
 
-from typing import Any
-
 from ropemother.bootstrap.policy import (
     DEFAULT_LIFECYCLE_TOPIC_ROOT,
     LifecycleMessageType,
@@ -31,7 +29,7 @@ from ropemother.format.portableformat import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:05:23+00:00"
+__date__ = "2026-08-20T17:40:50+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -100,8 +98,8 @@ class MessageEndpointFactory(
     def _make_history_client(
         self,
         request_client: RequestClient,
-        selection_format: PortableFormat[Any, Any],
-        page_format: PortableFormat[Any, Any],
+        selection_format: PortableFormat,
+        page_format: PortableFormat,
     ) -> HistoryClient:
         format_table = self._portable_format_table()
         history_client = HistoryClient._from_format_registry(
@@ -116,7 +114,7 @@ class MessageEndpointFactory(
         self,
         history: MessageHistory,
         request_service: RequestService,
-        page_format: PortableFormat[Any, Any],
+        page_format: PortableFormat,
     ) -> HistoryService:
         history_service = HistoryService(
             history, request_service, page_format=page_format

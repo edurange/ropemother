@@ -3,8 +3,7 @@
 
 """Asynchronous broker-side protocol session for one transport connection."""
 
-from asyncio import Task, create_task
-from typing import Any
+import asyncio
 
 from ropemother.broker.directcore import BrokerDeliveryTarget, DirectBrokerCore
 from ropemother.exceptions import MessageBusBaseException
@@ -33,7 +32,7 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-18T19:39:24+00:00"
+__date__ = "2026-08-20T17:38:44+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -45,7 +44,7 @@ class AsyncBrokerTransportSession:
     _core: DirectBrokerCore
     _state: TransportSessionState
     _delivery_targets: list[BrokerDeliveryTarget]
-    _delivery_tasks: list[Task[None]]
+    _delivery_tasks: list[asyncio.Task[None]]
 
     def __init__(
         self, *, channel: AsyncFrameChannel, core: DirectBrokerCore
@@ -227,7 +226,7 @@ class AsyncBrokerTransportSession:
     def _schedule_delivery(
         self, *, subscription_id: TransportSubscriptionID, message: BusMessage
     ) -> None:
-        task = create_task(
+        task = asyncio.create_task(
             self._send_delivery_frame(
                 subscription_id=subscription_id, message=message
             )
@@ -274,7 +273,7 @@ class AsyncBrokerTransportSession:
 
     def _supported_type_formats_from_frame(
         self, frame: RegisterEmitterFrame
-    ) -> dict[str, tuple[PortableFormat[Any, Any], ...]]:
+    ) -> dict[str, tuple[PortableFormat, ...]]:
         supported_type_formats = {}
         for support in frame.supported_type_formats:
             formats = tuple(

@@ -4,7 +4,7 @@
 """Read-side history over JSON Lines capture files."""
 
 import pathlib
-from typing import Any, Iterable, TextIO, cast, override
+import typing
 
 from ropemother.capture.history import (
     DEFAULT_HISTORY_MAX_COUNT,
@@ -25,7 +25,7 @@ from ropemother.util.onelinejson import JSONRecord, oneline_deserialize
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-13T18:31:41+00:00"
+__date__ = "2026-08-20T17:41:22+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -51,7 +51,7 @@ class JSONLinesCaptureHistory(MessageHistory):
         path: str | pathlib.Path,
         *,
         encoding: str = "utf-8",
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        extra_formats: typing.Iterable[PortableFormat] = (),
     ) -> None:
         source_path = pathlib.Path(path)
         self._source = _JSONLinesCaptureRecordSource(source_path, encoding)
@@ -63,7 +63,7 @@ class JSONLinesCaptureHistory(MessageHistory):
     def path(self) -> pathlib.Path:
         return self._source.path
 
-    @override
+    @typing.override
     def select(
         self,
         *,
@@ -105,12 +105,12 @@ class _JSONLinesCaptureRecordSource(CaptureRecordSource):
         return self._path
 
     @property
-    @override
+    @typing.override
     def capture_record_count(self) -> int:
         self._refresh_index()
         return len(self._record_offsets)
 
-    @override
+    @typing.override
     def read_capture_records(
         self, start_index: int, count: int
     ) -> tuple[CaptureRecord, ...]:
@@ -162,7 +162,7 @@ class _JSONLinesCaptureRecordSource(CaptureRecordSource):
         self._indexed_position = indexed_position
 
     def _new_record_offsets_from(
-        self, stream: TextIO
+        self, stream: typing.TextIO
     ) -> tuple[tuple[int, ...], int]:
         offsets: list[int] = []
 
@@ -236,4 +236,4 @@ class _JSONLinesCaptureRecordSource(CaptureRecordSource):
                     "JSONL capture record keys must be strings"
                 )
 
-        return cast(JSONRecord, value)
+        return typing.cast(JSONRecord, value)

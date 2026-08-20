@@ -51,7 +51,7 @@ class Emitter(abc.ABC):
         payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         ...
 
@@ -62,7 +62,7 @@ class Emitter(abc.ABC):
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> MessageID:
         ...
 
@@ -73,7 +73,7 @@ class Emitter(abc.ABC):
         payload: typing.Any,
         *,
         msg_type: str | None = None,
-        payload_format: PortableFormat[typing.Any, typing.Any] | None = None,
+        payload_format: PortableFormat | None = None,
     ) -> None:
         ...
 

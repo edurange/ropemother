@@ -3,8 +3,7 @@
 
 """Awaitable endpoint provisioning for asynchronous endpoint surfaces."""
 
-from abc import ABC, abstractmethod
-from typing import Any
+import abc
 
 from ropemother.bootstrap.policy import (
     DEFAULT_LIFECYCLE_TOPIC_ROOT,
@@ -44,16 +43,16 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-22T16:14:00+00:00"
+__date__ = "2026-08-20T17:38:20+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-class AsyncEndpointProvisioner(ABC):
+class AsyncEndpointProvisioner(abc.ABC):
     """ABC for provisioning async bus endpoints and clients."""
 
-    @abstractmethod
+    @abc.abstractmethod
     async def register_emitter(
         self,
         *,
@@ -62,12 +61,12 @@ class AsyncEndpointProvisioner(ABC):
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> AsyncEmitter:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     async def subscribe(
         self,
         *,
@@ -77,7 +76,7 @@ class AsyncEndpointProvisioner(ABC):
     ) -> AsyncReceiver:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def _portable_format_table(self) -> PortableFormatTable:
         ...
 
@@ -105,7 +104,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -136,7 +135,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> AsyncResponder:
         request_receiver = await self.subscribe(
@@ -162,7 +161,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -190,7 +189,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> AsyncRequestService:
         responder = await self.create_responder(
@@ -214,10 +213,10 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        request_payload_format: PortableFormat[Any, Any] = (
+        request_payload_format: PortableFormat = (
             JSON_PORTABLE_FORMAT
         ),
-        reply_payload_format: PortableFormat[Any, Any] = (
+        reply_payload_format: PortableFormat = (
             COMPOSITE_PORTABLE_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -253,7 +252,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        reply_payload_format: PortableFormat[Any, Any] = (
+        reply_payload_format: PortableFormat = (
             COMPOSITE_PORTABLE_FORMAT
         ),
         reply_type_formats: SupportedTypeFormatsInput | None = None,
@@ -282,7 +281,7 @@ class AsyncEndpointProvisioner(ABC):
         responder_producer: str,
         request_msg_type: str,
         reply_msg_type: str,
-        procedure_invocation_format: PortableFormat[Any, Any] = (
+        procedure_invocation_format: PortableFormat = (
             PROCEDURE_INVOCATION_JSON_FORMAT
         ),
         request_limits: RequestClientLimits | None = None,
@@ -311,7 +310,7 @@ class AsyncEndpointProvisioner(ABC):
         request_msg_type: str,
         reply_msg_type: str,
         handler: AsyncProcedureHandler,
-        reply_payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        reply_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         reply_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> AsyncProcedureService:
         request_service = await self.create_request_service(
@@ -342,7 +341,7 @@ class ImmediateAsyncEndpointProvisioner(AsyncEndpointProvisioner):
         msg_type: str,
         additional_msg_types: SymbolCollectionInput = (),
         allow_unlisted_type_formats: bool = False,
-        payload_format: PortableFormat[Any, Any] = JSON_PORTABLE_FORMAT,
+        payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
         supported_type_formats: SupportedTypeFormatsInput | None = None,
     ) -> AsyncEmitter:
         emitter = self._factory.register_emitter(
