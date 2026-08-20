@@ -156,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-18T19:46:59+00:00"
+__date__ = "2026-08-20T17:24:05+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -6931,9 +6931,9 @@ def demo_local_message_bus_host_broker_history() -> None:
         )
 
         host = LocalMessageBusHost(
+            BrokerHistoryExtension(history),
             runtime_directory=runtime_path,
             capture_sink=sink,
-            broker_extensions=[BrokerHistoryExtension(history)],
             extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
         )
         host.start()

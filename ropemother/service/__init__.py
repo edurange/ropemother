@@ -3,12 +3,12 @@
 
 """Programmatic helpers for message bus services."""
 
-from importlib import import_module
-from typing import Any
+import importlib
+import typing
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-12T03:23:22+00:00"
+__date__ = "2026-08-20T17:22:03+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -18,6 +18,9 @@ _EXPORTS = {
     "AsyncLocalBusServiceListener": "ropemother.service.socketlistener",
     "AsyncMessageBusService": "ropemother.service.asyncservice",
     "AsyncMessageBusServiceError": "ropemother.service.asyncservice",
+    "BrokerExtension": "ropemother.service.brokerextension",
+    "BrokerExtensionRunner": "ropemother.service.brokerextension",
+    "BrokerHistoryExtension": "ropemother.service.brokerhistory",
     "BrokerHistoryRunner": "ropemother.service.brokerhistory",
     "BUS_CONTACT_URI_VARIABLE": "ropemother.service.environment",
     "BusContactEnvironmentError": "ropemother.service.environment",
@@ -47,11 +50,11 @@ _EXPORTS = {
 __all__ = list(_EXPORTS)
 
 
-def __getattr__(name: str) -> Any:
+def __getattr__(name: str) -> typing.Any:
     if name not in _EXPORTS:
         raise AttributeError(name)
 
-    module = import_module(_EXPORTS[name])
+    module = importlib.import_module(_EXPORTS[name])
     value = getattr(module, name)
     globals()[name] = value
     return value

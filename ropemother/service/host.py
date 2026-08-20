@@ -3,13 +3,13 @@
 
 """Host abstractions for message bus service lifecycles."""
 
-from abc import ABC, abstractmethod
-from collections.abc import Iterable, Mapping
-from pathlib import Path
-from tempfile import TemporaryDirectory
-from threading import Thread
-from types import TracebackType
-from typing import Any, Self
+import abc
+import collections.abc
+import pathlib
+import tempfile
+import threading
+import types
+import typing
 
 from ropemother.broker.direct import DirectMessageBus
 from ropemother.broker.directcore import CaptureMode
@@ -35,7 +35,7 @@ from ropemother.transport.client import TransportClient
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:53:48+00:00"
+__date__ = "2026-08-20T17:13:14+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -64,33 +64,33 @@ class InvalidLocalMessageBusHostError(ValueError, MessageBusHostError):
     pass
 
 
-class MessageBusHost(ABC):
+class MessageBusHost(abc.ABC):
     """Lifecycle manager for a hosted message bus service."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def start(self) -> None:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def stop(self) -> None:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def close(self) -> None:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def connection_descriptor(self) -> ConnectionDescriptor:
         ...
 
-    @abstractmethod
+    @abc.abstractmethod
     def client(self, name: str | None = None) -> MessageEndpointFactory:
         ...
 
     def bus_contact_variables(
         self,
         *,
-        variables: Mapping[str, str] | None = None,
+        variables: collections.abc.Mapping[str, str] | None = None,
         name: str = BUS_CONTACT_URI_VARIABLE,
     ) -> dict[str, str]:
         contact_variables = bus_contact_variables(
@@ -98,7 +98,7 @@ class MessageBusHost(ABC):
         )
         return contact_variables
 
-    def __enter__(self) -> Self:
+    def __enter__(self) -> typing.Self:
         self.start()
         return self
 
@@ -106,23 +106,23 @@ class MessageBusHost(ABC):
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: TracebackType | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         self.close()
 
 
 class LocalMessageBusHost(MessageBusHost):
     """Local host for a freestanding message bus service."""
-    _runtime_directory: TemporaryDirectory[str] | None
-    _runtime_path: Path | None
-    _socket_path: Path | None
-    _configured_runtime_path: Path | None
-    _configured_socket_path: Path | None
+    _runtime_directory: tempfile.TemporaryDirectory[str] | None
+    _runtime_path: pathlib.Path | None
+    _socket_path: pathlib.Path | None
+    _configured_runtime_path: pathlib.Path | None
+    _configured_socket_path: pathlib.Path | None
     _bus: DirectMessageBus | None
     _service: MessageBusService | None
-    _service_thread: Thread | None
-    _broker_extensions: list[BrokerExtension]
-    _broker_extension_runners: list[BrokerExtensionRunner]
+    _service_thread: threading.Thread | None
+    _extensions: tuple[BrokerExtension, ...]
+    _extension_runners: list[BrokerExtensionRunner]
     _clients: list[tuple[str | None, TransportClient]]
     _started: bool
     _closed: bool
@@ -132,14 +132,13 @@ class LocalMessageBusHost(MessageBusHost):
 
     def __init__(
         self,
-        *,
-        extra_formats: Iterable[PortableFormat[Any, Any]] = (),
+        *extensions: BrokerExtension,
+        extra_formats: collections.abc.Iterable[PortableFormat] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
-        broker_extensions: list[BrokerExtension] | None = None,
         daemon_service: bool = True,
-        runtime_directory: Path | str | None = None,
-        socket_path: Path | str | None = None,
+        runtime_directory: pathlib.Path | str | None = None,
+        socket_path: pathlib.Path | str | None = None,
         replace_existing_socket: bool = False,
     ) -> None:
         if runtime_directory is not None and socket_path is not None:
@@ -163,10 +162,8 @@ class LocalMessageBusHost(MessageBusHost):
         self._bus = None
         self._service = None
         self._service_thread = None
-        if broker_extensions is None:
-            broker_extensions = []
-        self._broker_extensions = list(broker_extensions)
-        self._broker_extension_runners = []
+        self._extensions = extensions
+        self._extension_runners = []
         self._clients = []
         self._started = False
         self._closed = False
@@ -194,33 +191,31 @@ class LocalMessageBusHost(MessageBusHost):
             socket_path, replace_existing=self._replace_existing_socket
         )
         service = MessageBusService.from_listener(bus=bus, listener=listener)
-        service_thread = Thread(
+        service_thread = threading.Thread(
             target=service.serve_forever, daemon=self._daemon_service
         )
-        broker_extension_runners = []
-        for broker_extension in self._broker_extensions:
-            runner = broker_extension.create_runner(
-                bus, daemon=self._daemon_service
-            )
-            broker_extension_runners.append(runner)
+        extension_runners = []
+        for extension in self._extensions:
+            runner = extension.create_runner(bus, daemon=self._daemon_service)
+            extension_runners.append(runner)
         self._socket_path = socket_path
         self._bus = bus
         self._service = service
         self._service_thread = service_thread
-        self._broker_extension_runners = broker_extension_runners
+        self._extension_runners = extension_runners
         service_thread.start()
-        for runner in broker_extension_runners:
+        for runner in extension_runners:
             runner.start()
         self._started = True
 
     def stop(self) -> None:
-        for runner in self._broker_extension_runners:
+        for runner in self._extension_runners:
             runner.request_stop()
         if self._service is not None:
             self._service.request_stop()
         if self._service_thread is not None:
             self._service_thread.join()
-        for runner in self._broker_extension_runners:
+        for runner in self._extension_runners:
             runner.join()
 
     def close(self) -> None:
@@ -255,7 +250,7 @@ class LocalMessageBusHost(MessageBusHost):
         self._clients.append((name, client))
         return client
 
-    def _prepare_socket_path(self) -> Path:
+    def _prepare_socket_path(self) -> pathlib.Path:
         if self._configured_socket_path is not None:
             socket_path = self._configured_socket_path
             socket_path.parent.mkdir(parents=True, exist_ok=True)
@@ -268,15 +263,17 @@ class LocalMessageBusHost(MessageBusHost):
             self._runtime_path = runtime_path
             return socket_path
 
-        runtime_directory = TemporaryDirectory()
-        runtime_path = Path(runtime_directory.name)
+        runtime_directory = tempfile.TemporaryDirectory()
+        runtime_path = pathlib.Path(runtime_directory.name)
         socket_path = runtime_path / _DEFAULT_SOCKET_NAME
         self._runtime_directory = runtime_directory
         self._runtime_path = runtime_path
         return socket_path
 
-    def _normalize_path(self, path: Path | str | None) -> Path | None:
+    def _normalize_path(
+        self, path: pathlib.Path | str | None
+    ) -> pathlib.Path | None:
         if path is None:
             return None
 
-        return Path(path).expanduser().resolve()
+        return pathlib.Path(path).expanduser().resolve()

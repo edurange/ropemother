@@ -9,7 +9,6 @@ import pathlib
 import sys
 import tempfile
 import time
-from typing import Any
 
 from ropemother.broker.directcore import CaptureMode
 from ropemother.capture.filesink import JSONLinesCaptureSink
@@ -27,7 +26,7 @@ from ropemother.service.host import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-12T03:11:49+00:00"
+__date__ = "2026-08-20T17:17:19+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -39,17 +38,17 @@ DEFAULT_CAPTURE_FILENAME = "capture.jsonl"
 
 
 def serve_local_message_bus(
-    *,
-    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]] = (),
+    *extensions: BrokerExtension,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
     runtime_directory: pathlib.Path | str | None = DEFAULT_RUNTIME_DIRECTORY,
     socket_path: pathlib.Path | str | None = None,
     replace_existing_socket: bool = False,
     capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
     capture_sink: CaptureSink | None = None,
-    broker_extensions: list[BrokerExtension] | None = None,
 ) -> None:
     """Run a local message bus broker until interrupted."""
     with LocalMessageBusHost(
+        *extensions,
         extra_formats=extra_formats,
         runtime_directory=runtime_directory,
         socket_path=socket_path,
@@ -57,7 +56,6 @@ def serve_local_message_bus(
         daemon_service=False,
         capture_mode=capture_mode,
         capture_sink=capture_sink,
-        broker_extensions=broker_extensions,
     ) as host:
         descriptor = host.connection_descriptor()
         broker_uri = descriptor.to_uri()
@@ -76,7 +74,8 @@ def serve_local_message_bus(
 def run_local_broker_command(
     argv: collections.abc.Sequence[str] | None = None,
     *,
-    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]] = (),
+    extensions: collections.abc.Iterable[BrokerExtension] = (),
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
 ) -> int:
     args = _parse_arguments(argv)
     portable_formats = tuple(extra_formats)
@@ -92,19 +91,20 @@ def run_local_broker_command(
     capture_path = _capture_path_from_arguments(args, runtime_directory)
     capture_mode = _capture_mode_from_arguments(args)
     capture_sink = _capture_sink_from_arguments(args, capture_path)
-    broker_extensions = _broker_extensions_from_arguments(
+    command_extensions = _extensions_from_arguments(
         args, capture_path, extra_formats=portable_formats
     )
+    enabled_extensions = (*extensions, *command_extensions)
 
     try:
         serve_local_message_bus(
+            *enabled_extensions,
             extra_formats=portable_formats,
             runtime_directory=runtime_directory,
             socket_path=args.socket_path,
             replace_existing_socket=args.replace_existing_socket,
             capture_mode=capture_mode,
             capture_sink=capture_sink,
-            broker_extensions=broker_extensions,
         )
     finally:
         if temporary_runtime is not None:
@@ -218,27 +218,27 @@ def _capture_path_from_arguments(
     return capture_path.expanduser()
 
 
-def _broker_extensions_from_arguments(
+def _extensions_from_arguments(
     args: argparse.Namespace,
     capture_path: pathlib.Path | None,
     *,
-    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]],
+    extra_formats: collections.abc.Iterable[PortableFormat],
 ) -> list[BrokerExtension]:
-    broker_extensions = []
+    extensions = []
     history = _history_from_arguments(
         args, capture_path, extra_formats=extra_formats
     )
     if history is not None:
-        broker_extensions.append(BrokerHistoryExtension(history))
+        extensions.append(BrokerHistoryExtension(history))
 
-    return broker_extensions
+    return extensions
 
 
 def _history_from_arguments(
     args: argparse.Namespace,
     capture_path: pathlib.Path | None,
     *,
-    extra_formats: collections.abc.Iterable[PortableFormat[Any, Any]],
+    extra_formats: collections.abc.Iterable[PortableFormat],
 ) -> MessageHistory | None:
     if not args.history:
         return None
