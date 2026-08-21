@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ropemother/util/__init__.py
 
-"""Shared serialization and encoding utilities."""
+"""Shared serialization, encoding, and value type utilities."""
 
 from ropemother.util.compositeblobserializer import (
     COMPOSITE_BLOB_SERIALIZER,
@@ -26,10 +26,11 @@ from ropemother.util.serializer import (
     Serializer,
     TypeAdapter,
 )
+from ropemother.util.typedid import TypedID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-11T02:18:40+00:00"
+__date__ = "2026-08-21T19:13:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -50,6 +51,7 @@ __all__ = [
     "SerializationError",
     "Serializer",
     "TypeAdapter",
+    "TypedID",
     "oneline_deserialize",
     "oneline_serialize",
 ]
