@@ -8,7 +8,7 @@ import typing
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:22:03+00:00"
+__date__ = "2026-08-21T00:21:29+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -19,9 +19,9 @@ _EXPORTS = {
     "AsyncMessageBusService": "ropemother.service.asyncservice",
     "AsyncMessageBusServiceError": "ropemother.service.asyncservice",
     "BrokerExtension": "ropemother.service.brokerextension",
-    "BrokerExtensionRunner": "ropemother.service.brokerextension",
+    "BrokerExtensionHandler": "ropemother.service.brokerextension",
+    "BrokerExtensionHandlers": "ropemother.service.brokerextension",
     "BrokerHistoryExtension": "ropemother.service.brokerhistory",
-    "BrokerHistoryRunner": "ropemother.service.brokerhistory",
     "BUS_CONTACT_URI_VARIABLE": "ropemother.service.environment",
     "BusContactEnvironmentError": "ropemother.service.environment",
     "ConnectionDescriptor": "ropemother.service.descriptor",

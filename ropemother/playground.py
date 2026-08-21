@@ -102,7 +102,6 @@ from ropemother.message.symbols import (
 )
 from ropemother.service.brokerhistory import (
     BrokerHistoryExtension,
-    BrokerHistoryRunner,
     preconfigured_history_client,
 )
 from ropemother.service.connector import connect_transport_client
@@ -156,7 +155,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:24:05+00:00"
+__date__ = "2026-08-20T23:43:54+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -7354,35 +7353,19 @@ def demo_history_cursor_continues_selection() -> None:
 
 def demo_history_select_all_follows_cursors() -> None:
     print("Demo: history select-all follows cursors across pages")
-    bus = DirectMessageBus()
     sink = InMemoryCaptureSink()
-    bus.set_capture_sink(sink)
     history = InMemoryCaptureHistory(sink)
+    host = LocalMessageBusHost(
+        BrokerHistoryExtension(history), capture_sink=sink
+    )
+    host.start()
+    bus = host.client()
     emitter = bus.register_emitter(
         msg_topic=DEMO_TOPIC,
         msg_producer=DEMO_PRODUCER,
         msg_type=DEMO_MSG_TYPE,
     )
-    requester_name = "requester-foo"
-    responder_name = "responder-bar"
-    client = bus.create_history_client(
-        request_topic=DEMO_TOPIC,
-        reply_topic=DEMO_TOPIC,
-        requester_producer=requester_name,
-        responder_producer=responder_name,
-        request_msg_type=DEMO_MSG_TYPE,
-        reply_msg_type=DEMO_ALT_MSG_TYPE,
-    )
-    service = bus.create_history_service(
-        history=history,
-        request_topic=DEMO_TOPIC,
-        reply_topic=DEMO_TOPIC,
-        requester_producer=requester_name,
-        responder_producer=responder_name,
-        request_msg_type=DEMO_MSG_TYPE,
-        reply_msg_type=DEMO_ALT_MSG_TYPE,
-    )
-    runner = BrokerHistoryRunner(service)
+    client = preconfigured_history_client(bus)
     canonical_payloads = (
         {"value": "first"},
         {"value": "second"},
@@ -7392,15 +7375,13 @@ def demo_history_select_all_follows_cursors() -> None:
     for payload in canonical_payloads:
         emitter.emit(payload)
 
-    runner.start()
     entries = client.select_all(
         msg_topic=DEMO_TOPIC,
         msg_type=DEMO_MSG_TYPE,
         msg_producer=DEMO_PRODUCER,
         max_count=1,
     )
-    runner.request_stop()
-    runner.join()
+    host.close()
     received_payloads = tuple(entry.payload for entry in entries)
 
     print(f"{canonical_payloads=}")

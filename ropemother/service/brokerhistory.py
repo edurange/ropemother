@@ -3,9 +3,6 @@
 
 """Built-in message history service profile."""
 
-from threading import Event, Thread
-from time import sleep
-
 from ropemother.capture.history import MessageHistory
 from ropemother.capture.historyservice import (
     DEFAULT_HISTORY_PAGE_FORMAT,
@@ -14,15 +11,14 @@ from ropemother.capture.historyservice import (
     HistoryService,
 )
 from ropemother.client.endpointfactory import MessageEndpointFactory
-from ropemother.exceptions import MessageBusBaseException
 from ropemother.service.brokerextension import (
     BrokerExtension,
-    BrokerExtensionRunner,
+    BrokerExtensionHandler,
 )
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-11T00:08:55+00:00"
+__date__ = "2026-08-21T00:08:14+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -35,75 +31,6 @@ BROKER_HISTORY_RESPONDER_PRODUCER = "ropemother-broker-history-service"
 BROKER_HISTORY_REQUEST_TYPE = "ropemother-broker-history-request"
 BROKER_HISTORY_REPLY_TYPE = "ropemother-broker-history-reply"
 
-_BROKER_HISTORY_IDLE_SLEEP_SECONDS = 0.05
-
-
-class BrokerHistoryRunnerError(MessageBusBaseException):
-    """Base exception for broker history service runner errors."""
-    pass
-
-
-class BrokerHistoryAlreadyStartedError(RuntimeError, BrokerHistoryRunnerError):
-    """Raised when a broker history service runner starts twice."""
-    pass
-
-
-class BrokerHistoryFailedError(RuntimeError, BrokerHistoryRunnerError):
-    """Raised when a broker history service runner fails."""
-    pass
-
-
-class BrokerHistoryRunner(BrokerExtensionRunner):
-    """Thread runner for the built-in history service."""
-    _history_service: HistoryService
-    _stop_requested: Event
-    _thread: Thread | None
-    _daemon: bool
-    _error: Exception | None
-
-    def __init__(
-        self, history_service: HistoryService, *, daemon: bool = True
-    ) -> None:
-        self._history_service = history_service
-        self._stop_requested = Event()
-        self._thread = None
-        self._daemon = daemon
-        self._error = None
-
-    def start(self) -> None:
-        if self._thread is not None:
-            raise BrokerHistoryAlreadyStartedError(
-                "broker history runner has already been started"
-            )
-
-        thread = Thread(target=self.run, daemon=self._daemon)
-        self._thread = thread
-        thread.start()
-
-    def run(self) -> None:
-        try:
-            while not self._stop_requested.is_set():
-                handled = self._history_service.handle_available()
-                if handled == 0:
-                    sleep(_BROKER_HISTORY_IDLE_SLEEP_SECONDS)
-        except Exception as error:
-            self._error = error
-            self._stop_requested.set()
-
-    def request_stop(self) -> None:
-        self._stop_requested.set()
-
-    def join(self) -> None:
-        thread = self._thread
-        if thread is None:
-            return
-
-        thread.join()
-        if self._error is not None:
-            raise BrokerHistoryFailedError(
-                "broker history runner failed"
-            ) from self._error
-
 
 class BrokerHistoryExtension(BrokerExtension):
     """Turnkey history extension for freestanding broker hosts."""
@@ -112,11 +39,11 @@ class BrokerHistoryExtension(BrokerExtension):
     def __init__(self, history: MessageHistory) -> None:
         self._history = history
 
-    def create_runner(
-        self, bus: MessageEndpointFactory, *, daemon: bool
-    ) -> BrokerExtensionRunner:
+    def create_handler(
+        self, bus: MessageEndpointFactory
+    ) -> BrokerExtensionHandler:
         service = preconfigured_history_service(bus, self._history)
-        return BrokerHistoryRunner(service, daemon=daemon)
+        return service.handle_available
 
 
 def preconfigured_history_service(

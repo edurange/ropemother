@@ -19,10 +19,7 @@ from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.defaults import default_portable_format_registry
 from ropemother.format.portableformat import PortableFormat
 from ropemother.format.registry import PortableFormatRegistry
-from ropemother.service.brokerextension import (
-    BrokerExtension,
-    BrokerExtensionRunner,
-)
+from ropemother.service.brokerextension import BrokerExtension
 from ropemother.service.connector import connect_transport_client
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.service.environment import (
@@ -35,7 +32,7 @@ from ropemother.transport.client import TransportClient
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:13:14+00:00"
+__date__ = "2026-08-20T23:37:19+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -122,7 +119,6 @@ class LocalMessageBusHost(MessageBusHost):
     _service: MessageBusService | None
     _service_thread: threading.Thread | None
     _extensions: tuple[BrokerExtension, ...]
-    _extension_runners: list[BrokerExtensionRunner]
     _clients: list[tuple[str | None, TransportClient]]
     _started: bool
     _closed: bool
@@ -163,7 +159,6 @@ class LocalMessageBusHost(MessageBusHost):
         self._service = None
         self._service_thread = None
         self._extensions = extensions
-        self._extension_runners = []
         self._clients = []
         self._started = False
         self._closed = False
@@ -187,36 +182,34 @@ class LocalMessageBusHost(MessageBusHost):
             extra_formats=self._format_registry.formats(),
         )
 
+        extension_handlers = []
+        for extension in self._extensions:
+            handler = extension.create_handler(bus)
+            extension_handlers.append(handler)
+
         listener = LocalBusServiceListener.from_socket_path(
             socket_path, replace_existing=self._replace_existing_socket
         )
-        service = MessageBusService.from_listener(bus=bus, listener=listener)
+        service = MessageBusService.from_listener(
+            bus=bus,
+            listener=listener,
+            extension_handlers=extension_handlers,
+        )
         service_thread = threading.Thread(
             target=service.serve_forever, daemon=self._daemon_service
         )
-        extension_runners = []
-        for extension in self._extensions:
-            runner = extension.create_runner(bus, daemon=self._daemon_service)
-            extension_runners.append(runner)
         self._socket_path = socket_path
         self._bus = bus
         self._service = service
         self._service_thread = service_thread
-        self._extension_runners = extension_runners
         service_thread.start()
-        for runner in extension_runners:
-            runner.start()
         self._started = True
 
     def stop(self) -> None:
-        for runner in self._extension_runners:
-            runner.request_stop()
         if self._service is not None:
             self._service.request_stop()
         if self._service_thread is not None:
             self._service_thread.join()
-        for runner in self._extension_runners:
-            runner.join()
 
     def close(self) -> None:
         if self._closed:

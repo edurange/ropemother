@@ -3,39 +3,29 @@
 
 """Extension points for capabilities attached to freestanding broker hosts."""
 
-from abc import ABC, abstractmethod
+import abc
+import collections.abc
 
 from ropemother.client.endpointfactory import MessageEndpointFactory
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-05T01:38:06+00:00"
+__date__ = "2026-08-21T00:02:33+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
 
 
-class BrokerExtensionRunner(ABC):
-    """Lifecycle runner for one broker extension."""
-
-    @abstractmethod
-    def start(self) -> None:
-        pass
-
-    @abstractmethod
-    def request_stop(self) -> None:
-        pass
-
-    @abstractmethod
-    def join(self) -> None:
-        pass
+type BrokerExtensionHandler = collections.abc.Callable[[], int]
+type BrokerExtensionHandlers = collections.abc.Iterable[BrokerExtensionHandler]
 
 
-class BrokerExtension(ABC):
+class BrokerExtension(abc.ABC):
     """Capability that can be attached to a freestanding broker host."""
 
-    @abstractmethod
-    def create_runner(
-        self, bus: MessageEndpointFactory, *, daemon: bool
-    ) -> BrokerExtensionRunner:
+    @abc.abstractmethod
+    def create_handler(
+        self, bus: MessageEndpointFactory
+    ) -> BrokerExtensionHandler:
+        """Return a nonblocking handler for available extension work."""
         pass

@@ -3,15 +3,19 @@
 
 """Programmatic foreground service wrapper for message bus brokers."""
 
-from collections.abc import Mapping
-from threading import Event
-from typing import Self
+import collections.abc
+import threading
+import typing
 
 from ropemother.bootstrap.buffer import BootstrapBufferLimits
 from ropemother.bootstrap.policy import BootstrapPolicy
 from ropemother.broker.direct import DirectMessageBus
 from ropemother.capture.sink import CaptureSink
 from ropemother.exceptions import MessageBusBaseException
+from ropemother.service.brokerextension import (
+    BrokerExtensionHandler,
+    BrokerExtensionHandlers,
+)
 from ropemother.service.descriptor import ConnectionDescriptor
 from ropemother.service.environment import (
     BUS_CONTACT_URI_VARIABLE,
@@ -23,7 +27,7 @@ from ropemother.transport.sessionrunner import BrokerTransportSessionRunner
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-09T17:06:57+00:00"
+__date__ = "2026-08-21T00:04:48+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -50,10 +54,11 @@ class MessageBusService:
     _bus: DirectMessageBus
     _listener: FrameConnectionListener
     _session_runners: list[BrokerTransportSessionRunner]
-    _stop_requested: Event
+    _stop_requested: threading.Event
     _started: bool
     _closed: bool
     _daemon_sessions: bool
+    _extension_handlers: tuple[BrokerExtensionHandler, ...]
 
     def __init__(
         self,
@@ -61,14 +66,16 @@ class MessageBusService:
         bus: DirectMessageBus,
         listener: FrameConnectionListener,
         daemon_sessions: bool = True,
+        extension_handlers: BrokerExtensionHandlers = (),
     ) -> None:
         self._bus = bus
         self._listener = listener
         self._session_runners = []
-        self._stop_requested = Event()
+        self._stop_requested = threading.Event()
         self._started = False
         self._closed = False
         self._daemon_sessions = daemon_sessions
+        self._extension_handlers = tuple(extension_handlers)
 
     @classmethod
     def from_listener(
@@ -77,11 +84,13 @@ class MessageBusService:
         bus: DirectMessageBus,
         listener: FrameConnectionListener,
         daemon_sessions: bool = True,
-    ) -> Self:
+        extension_handlers: BrokerExtensionHandlers = (),
+    ) -> typing.Self:
         service = cls(
             bus=bus,
             listener=listener,
             daemon_sessions=daemon_sessions,
+            extension_handlers=extension_handlers,
         )
         return service
 
@@ -93,7 +102,7 @@ class MessageBusService:
         bootstrap_policy: BootstrapPolicy | None = None,
         bootstrap_limits: BootstrapBufferLimits | None = None,
         daemon_sessions: bool = True,
-    ) -> Self:
+    ) -> typing.Self:
         bus = DirectMessageBus.capture_bootstrap(
             bootstrap_policy=bootstrap_policy,
             bootstrap_limits=bootstrap_limits,
@@ -112,7 +121,7 @@ class MessageBusService:
     def bus_contact_variables(
         self,
         *,
-        variables: Mapping[str, str] | None = None,
+        variables: collections.abc.Mapping[str, str] | None = None,
         name: str = BUS_CONTACT_URI_VARIABLE,
     ) -> dict[str, str]:
         contact_variables = bus_contact_variables(
@@ -155,6 +164,7 @@ class MessageBusService:
 
     def _serve_until_stopped(self) -> None:
         while not self._stop_requested.is_set():
+            self._handle_extensions()
             try:
                 connection = self._listener.accept()
             except TimeoutError:
@@ -165,6 +175,10 @@ class MessageBusService:
                 raise
 
             self._start_session(connection)
+
+    def _handle_extensions(self) -> None:
+        for handler in self._extension_handlers:
+            handler()
 
     def _start_session(self, connection: FrameConnection) -> None:
         channel = FrameChannel(connection)
