@@ -8,7 +8,7 @@ from typing import Any
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-07-06T06:31:36+00:00"
+__date__ = "2026-08-22T17:45:37+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -27,6 +27,7 @@ _EXPORTS = {
     "InvalidProcedureInvocationError": "ropemother.client.procedure",
     "InvalidProcedureInvocationTypeError": "ropemother.client.procedure",
     "MessageEndpointFactory": "ropemother.client.endpointfactory",
+    "OptionalSymbolInput": "ropemother.message.selectors",
     "PROCEDURE_INVOCATION_JSON_FORMAT": "ropemother.client.procedure",
     "ProcedureClient": "ropemother.client.request",
     "ProcedureError": "ropemother.client.procedure",
@@ -39,6 +40,9 @@ _EXPORTS = {
     "RequestService": "ropemother.client.request",
     "SAME_MSG_TYPE": "ropemother.client.requestoptions",
     "ServiceRequest": "ropemother.client.request",
+    "SubscriptionTopicInput": "ropemother.message.selectors",
+    "SupportedTypeFormatsInput": "ropemother.message.typeformats",
+    "SymbolCollectionInput": "ropemother.message.selectors",
 }
 
 __all__ = list(_EXPORTS)
