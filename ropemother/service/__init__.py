@@ -8,7 +8,7 @@ import typing
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-21T00:21:29+00:00"
+__date__ = "2026-08-25T20:49:35+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -41,6 +41,7 @@ _EXPORTS = {
     "connect_client_from_bus_contact": "ropemother.service.environment",
     "connect_message_bus": "ropemother.service.environment",
     "preconfigured_history_client": "ropemother.service.brokerhistory",
+    "preconfigured_history_host": "ropemother.service.broker",
     "preconfigured_history_service": "ropemother.service.brokerhistory",
     "run_local_broker_command": "ropemother.service.broker",
     "serve_local_message_bus": "ropemother.service.broker",

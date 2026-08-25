@@ -100,6 +100,7 @@ from ropemother.message.symbols import (
     ReservedMessageSymbolError,
     TopicID,
 )
+from ropemother.service.broker import preconfigured_history_host
 from ropemother.service.brokerhistory import (
     BrokerHistoryExtension,
     preconfigured_history_client,
@@ -155,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T23:43:54+00:00"
+__date__ = "2026-08-25T21:09:07+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -6922,17 +6923,8 @@ def demo_local_message_bus_host_broker_history() -> None:
     print("Demo: local message bus host preconfigured broker history")
     with tempfile.TemporaryDirectory() as runtime_dir:
         runtime_path = pathlib.Path(runtime_dir)
-        capture_path = runtime_path / "capture.jsonl"
-        sink = JSONLinesCaptureSink(capture_path, append=False)
-        history = JSONLinesCaptureHistory(
-            capture_path,
-            extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
-        )
-
-        host = LocalMessageBusHost(
-            BrokerHistoryExtension(history),
+        host = preconfigured_history_host(
             runtime_directory=runtime_path,
-            capture_sink=sink,
             extra_formats=(DEMO_BOUNDARY_PAYLOAD_FORMAT,),
         )
         host.start()

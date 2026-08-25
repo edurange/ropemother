@@ -13,20 +13,16 @@ import time
 from ropemother.broker.directcore import CaptureMode
 from ropemother.capture.filesink import JSONLinesCaptureSink
 from ropemother.capture.filehistory import JSONLinesCaptureHistory
-from ropemother.capture.history import MessageHistory
 from ropemother.capture.sink import CaptureSink
 from ropemother.format.portableformat import PortableFormat
 from ropemother.service.brokerextension import BrokerExtension
 from ropemother.service.brokerhistory import BrokerHistoryExtension
 from ropemother.service.environment import BUS_CONTACT_URI_VARIABLE
-from ropemother.service.host import (
-    InvalidLocalMessageBusHostError,
-    LocalMessageBusHost,
-)
+from ropemother.service.host import LocalMessageBusHost
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:17:19+00:00"
+__date__ = "2026-08-25T21:02:29+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -47,7 +43,7 @@ def serve_local_message_bus(
     capture_sink: CaptureSink | None = None,
 ) -> None:
     """Run a local message bus broker until interrupted."""
-    with LocalMessageBusHost(
+    host = LocalMessageBusHost(
         *extensions,
         extra_formats=extra_formats,
         runtime_directory=runtime_directory,
@@ -56,19 +52,8 @@ def serve_local_message_bus(
         daemon_service=False,
         capture_mode=capture_mode,
         capture_sink=capture_sink,
-    ) as host:
-        descriptor = host.connection_descriptor()
-        broker_uri = descriptor.to_uri()
-        environment = f"{BUS_CONTACT_URI_VARIABLE}={broker_uri}"
-        print("Message bus broker is running", flush=True)
-        print(f"broker URI: {broker_uri}", flush=True)
-        print(f"environment: {environment}", flush=True)
-        print("Press Ctrl-C to stop", flush=True)
-        try:
-            while True:
-                time.sleep(BROKER_IDLE_SLEEP_SECONDS)
-        except KeyboardInterrupt:
-            print("Stopping message bus broker", flush=True)
+    )
+    _serve_local_message_bus_host(host)
 
 
 def run_local_broker_command(
@@ -88,29 +73,86 @@ def run_local_broker_command(
     else:
         runtime_directory = _runtime_directory_from_arguments(args)
 
-    capture_path = _capture_path_from_arguments(args, runtime_directory)
-    capture_mode = _capture_mode_from_arguments(args)
-    capture_sink = _capture_sink_from_arguments(args, capture_path)
-    command_extensions = _extensions_from_arguments(
-        args, capture_path, extra_formats=portable_formats
-    )
-    enabled_extensions = (*extensions, *command_extensions)
-
-    try:
-        serve_local_message_bus(
-            *enabled_extensions,
+    if args.history:
+        host = preconfigured_history_host(
+            *extensions,
             extra_formats=portable_formats,
             runtime_directory=runtime_directory,
             socket_path=args.socket_path,
             replace_existing_socket=args.replace_existing_socket,
-            capture_mode=capture_mode,
+            capture_path=args.capture_path,
+            replace_capture=args.replace_capture,
+            daemon_service=False,
+        )
+    else:
+        capture_path = _capture_path_from_arguments(args, runtime_directory)
+        capture_sink = _capture_sink_from_arguments(args, capture_path)
+        host = LocalMessageBusHost(
+            *extensions,
+            extra_formats=portable_formats,
+            runtime_directory=runtime_directory,
+            socket_path=args.socket_path,
+            replace_existing_socket=args.replace_existing_socket,
+            daemon_service=False,
+            capture_mode=_capture_mode_from_arguments(args),
             capture_sink=capture_sink,
         )
+
+    try:
+        _serve_local_message_bus_host(host)
     finally:
         if temporary_runtime is not None:
             temporary_runtime.cleanup()
 
     return 0
+
+
+def preconfigured_history_host(
+    *extensions: BrokerExtension,
+    extra_formats: collections.abc.Iterable[PortableFormat] = (),
+    runtime_directory: pathlib.Path | str | None = DEFAULT_RUNTIME_DIRECTORY,
+    socket_path: pathlib.Path | str | None = None,
+    replace_existing_socket: bool = False,
+    capture_path: pathlib.Path | str | None = None,
+    replace_capture: bool = False,
+    daemon_service: bool = True,
+) -> LocalMessageBusHost:
+    """Return a local broker host with captured history enabled."""
+    portable_formats = tuple(extra_formats)
+    selected_capture_path = _capture_path(capture_path, runtime_directory)
+    sink = _json_lines_capture_sink(
+        selected_capture_path, replace_capture=replace_capture
+    )
+    history = JSONLinesCaptureHistory(
+        selected_capture_path, extra_formats=portable_formats
+    )
+    host = LocalMessageBusHost(
+        *extensions,
+        BrokerHistoryExtension(history),
+        extra_formats=portable_formats,
+        runtime_directory=runtime_directory,
+        socket_path=socket_path,
+        replace_existing_socket=replace_existing_socket,
+        capture_sink=sink,
+        daemon_service=daemon_service,
+    )
+    return host
+
+
+def _serve_local_message_bus_host(host: LocalMessageBusHost) -> None:
+    with host:
+        descriptor = host.connection_descriptor()
+        broker_uri = descriptor.to_uri()
+        environment = f"{BUS_CONTACT_URI_VARIABLE}={broker_uri}"
+        print("Message bus broker is running", flush=True)
+        print(f"broker URI: {broker_uri}", flush=True)
+        print(f"environment: {environment}", flush=True)
+        print("Press Ctrl-C to stop", flush=True)
+        try:
+            while True:
+                time.sleep(BROKER_IDLE_SLEEP_SECONDS)
+        except KeyboardInterrupt:
+            print("Stopping message bus broker", flush=True)
 
 
 def _runtime_directory_from_arguments(
@@ -182,14 +224,24 @@ def _parse_arguments(
     return args
 
 
+def _json_lines_capture_sink(
+    capture_path: pathlib.Path, *, replace_capture: bool
+) -> JSONLinesCaptureSink:
+    capture_path.parent.mkdir(parents=True, exist_ok=True)
+    capture_path.touch(exist_ok=True)
+    return JSONLinesCaptureSink(capture_path, append=not replace_capture)
+
+
 def _capture_sink_from_arguments(
     args: argparse.Namespace, capture_path: pathlib.Path | None
 ) -> CaptureSink | None:
     if capture_path is None:
         return None
 
-    capture_path.parent.mkdir(parents=True, exist_ok=True)
-    return JSONLinesCaptureSink(capture_path, append=not args.replace_capture)
+    sink = _json_lines_capture_sink(
+        capture_path, replace_capture=args.replace_capture
+    )
+    return sink
 
 
 def _capture_mode_from_arguments(args: argparse.Namespace) -> CaptureMode:
@@ -205,52 +257,21 @@ def _capture_path_from_arguments(
     if args.transport_only:
         return None
 
-    if args.capture_path is not None:
-        return pathlib.Path(args.capture_path).expanduser()
+    return _capture_path(args.capture_path, runtime_directory)
 
-    if runtime_directory is None:
-        capture_path = pathlib.Path(DEFAULT_CAPTURE_FILENAME)
+
+def _capture_path(
+    capture_path: pathlib.Path | str | None,
+    runtime_directory: pathlib.Path | str | None,
+) -> pathlib.Path:
+    if capture_path is not None:
+        path = pathlib.Path(capture_path)
+    elif runtime_directory is None:
+        path = pathlib.Path(DEFAULT_CAPTURE_FILENAME)
     else:
-        capture_path = (
-            pathlib.Path(runtime_directory) / DEFAULT_CAPTURE_FILENAME
-        )
+        path = pathlib.Path(runtime_directory) / DEFAULT_CAPTURE_FILENAME
 
-    return capture_path.expanduser()
-
-
-def _extensions_from_arguments(
-    args: argparse.Namespace,
-    capture_path: pathlib.Path | None,
-    *,
-    extra_formats: collections.abc.Iterable[PortableFormat],
-) -> list[BrokerExtension]:
-    extensions = []
-    history = _history_from_arguments(
-        args, capture_path, extra_formats=extra_formats
-    )
-    if history is not None:
-        extensions.append(BrokerHistoryExtension(history))
-
-    return extensions
-
-
-def _history_from_arguments(
-    args: argparse.Namespace,
-    capture_path: pathlib.Path | None,
-    *,
-    extra_formats: collections.abc.Iterable[PortableFormat],
-) -> MessageHistory | None:
-    if not args.history:
-        return None
-
-    if capture_path is None:
-        raise InvalidLocalMessageBusHostError(
-            "broker history requires capture to be enabled"
-        )
-
-    capture_path.parent.mkdir(parents=True, exist_ok=True)
-    capture_path.touch(exist_ok=True)
-    return JSONLinesCaptureHistory(capture_path, extra_formats=extra_formats)
+    return path.expanduser()
 
 
 if __name__ == "__main__":
