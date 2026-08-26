@@ -16,7 +16,7 @@ from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T16:56:27+00:00"
+__date__ = "2026-08-26T15:07:57+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -39,6 +39,11 @@ class UnlistedMessageTypeError(ValueError, EndpointUsageError):
 
 class UnsupportedTypeFormatError(ValueError, EndpointUsageError):
     """Raised when a message type does not support a payload format."""
+    pass
+
+
+class InvalidReceiverSelectionError(ValueError, EndpointUsageError):
+    """Raised when a multi-receiver selection is invalid."""
     pass
 
 

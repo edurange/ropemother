@@ -3,9 +3,10 @@
 
 """Synchronous in-process broker and support classes, without transport."""
 
-from collections.abc import Iterable
-from queue import Empty, Queue
-from typing import Any, Self
+import collections.abc
+import queue
+import threading
+import typing
 
 from ropemother.bootstrap.buffer import BootstrapBufferLimits
 from ropemother.bootstrap.policy import BootstrapPolicy
@@ -16,7 +17,12 @@ from ropemother.broker.directcore import (
     DirectBrokerCore,
     EmitterBinding,
 )
-from ropemother.broker.endpoints import Emitter, Receiver, reply_metadata_for
+from ropemother.broker.endpoints import (
+    Emitter,
+    InvalidReceiverSelectionError,
+    Receiver,
+    reply_metadata_for,
+)
 from ropemother.broker.subscription import Subscription
 from ropemother.capture.sink import CaptureSink
 from ropemother.capture.writer import CaptureRecordSource
@@ -49,7 +55,7 @@ from ropemother.transport.session import BrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:40:25+00:00"
+__date__ = "2026-08-26T15:10:42+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -58,11 +64,12 @@ __status__ = "Development"
 class DirectMessageBus(MessageBus):
     """Direct broker that routes messages to local receiver queues."""
     _core: DirectBrokerCore
+    _receive_monitor: "_ReceiveMonitor"
 
     def __init__(
         self,
         *,
-        extra_formats: Iterable[PortableFormat] = (),
+        extra_formats: collections.abc.Iterable[PortableFormat] = (),
         capture_mode: CaptureMode = CaptureMode.CAPTURE_ENABLED,
         capture_sink: CaptureSink | None = None,
     ) -> None:
@@ -75,6 +82,7 @@ class DirectMessageBus(MessageBus):
             capture_sink=capture_sink,
             extra_formats=extra_formats,
         )
+        self._receive_monitor = _ReceiveMonitor()
 
     def register_emitter(
         self,
@@ -111,18 +119,24 @@ class DirectMessageBus(MessageBus):
             msg_producer=msg_producer,
             msg_type=msg_type,
         )
-        receiver = _BrokerReceiver()
+        receiver = _BrokerReceiver(self._receive_monitor)
         self._core.add_receiver(
             subscription=binding.subscription,
             delivery_target=receiver.delivery_target,
         )
         return receiver
 
+    def receive_from(
+        self, *receivers: Receiver
+    ) -> tuple[Receiver, ReceivedMessage]:
+        selected_receivers = self._validate_receiver_selection(receivers)
+        return self._receive_monitor.receive_from(selected_receivers)
+
     def install_format(self, payload_format: PortableFormat) -> None:
         self._core.install_format(payload_format)
 
     def install_formats(
-        self, payload_formats: Iterable[PortableFormat]
+        self, payload_formats: collections.abc.Iterable[PortableFormat]
     ) -> None:
         self._core.install_formats(payload_formats)
 
@@ -132,13 +146,35 @@ class DirectMessageBus(MessageBus):
     def capture_source(self) -> CaptureRecordSource | None:
         return self._core.capture_source()
 
-    def _portable_format_table(self) -> PortableFormatRegistry:
-        return self._core.format_registry()
-
     def create_transport_session(
         self, *, channel: FrameChannel
     ) -> BrokerTransportSession:
         return BrokerTransportSession(channel=channel, core=self._core)
+
+    def _portable_format_table(self) -> PortableFormatRegistry:
+        return self._core.format_registry()
+
+    def _validate_receiver_selection(
+        self, receivers: tuple[Receiver, ...]
+    ) -> tuple["_BrokerReceiver", ...]:
+        if not receivers:
+            raise InvalidReceiverSelectionError(
+                "receive_from requires at least one receiver"
+            )
+
+        selected_receivers = []
+        for receiver in receivers:
+            if (
+                not isinstance(receiver, _BrokerReceiver)
+                or receiver._receive_monitor is not self._receive_monitor
+            ):
+                raise InvalidReceiverSelectionError(
+                    "receive_from requires receivers created by this bus"
+                )
+            selected_receivers.append(receiver)
+
+        result = tuple(selected_receivers)
+        return result
 
     @classmethod
     def capture_bootstrap(
@@ -146,7 +182,7 @@ class DirectMessageBus(MessageBus):
         *,
         bootstrap_policy: BootstrapPolicy | None = None,
         bootstrap_limits: BootstrapBufferLimits | None = None,
-    ) -> Self:
+    ) -> typing.Self:
         core = DirectBrokerCore(
             capture_enabled=True,
             bootstrap_enabled=True,
@@ -157,9 +193,10 @@ class DirectMessageBus(MessageBus):
         return bus
 
     @classmethod
-    def _from_core(cls, core: DirectBrokerCore) -> Self:
+    def _from_core(cls, core: DirectBrokerCore) -> typing.Self:
         bus = cls.__new__(cls)
         bus._core = core
+        bus._receive_monitor = _ReceiveMonitor()
         return bus
 
 
@@ -175,7 +212,7 @@ class _BrokerEmitter(Emitter):
 
     def emit(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
         payload_format: PortableFormat | None = None,
@@ -190,7 +227,7 @@ class _BrokerEmitter(Emitter):
 
     def emit_request(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
@@ -209,7 +246,7 @@ class _BrokerEmitter(Emitter):
     def emit_reply(
         self,
         request: ReceivedMessage,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
         payload_format: PortableFormat | None = None,
@@ -227,12 +264,16 @@ class _BrokerEmitter(Emitter):
 
 
 class _BrokerReceiver(Receiver):
-    _queue: Queue[ReceivedMessage]
+    _queue: queue.Queue[ReceivedMessage]
     _delivery_target: BrokerDeliveryTarget
+    _receive_monitor: "_ReceiveMonitor"
 
-    def __init__(self) -> None:
-        self._queue = Queue()
-        self._delivery_target = _SyncDeliveryTarget(self._queue)
+    def __init__(self, receive_monitor: "_ReceiveMonitor") -> None:
+        self._queue = queue.Queue()
+        self._receive_monitor = receive_monitor
+        self._delivery_target = _SyncDeliveryTarget(
+            self._queue, receive_monitor
+        )
 
     @property
     def delivery_target(self) -> BrokerDeliveryTarget:
@@ -247,16 +288,51 @@ class _BrokerReceiver(Receiver):
         while max_count is None or len(messages) < max_count:
             try:
                 messages.append(self._queue.get_nowait())
-            except Empty:
+            except queue.Empty:
                 break
         return messages
 
 
 class _SyncDeliveryTarget(BrokerDeliveryTarget):
-    _queue: Queue[ReceivedMessage]
+    _queue: queue.Queue[ReceivedMessage]
+    _receive_monitor: "_ReceiveMonitor"
 
-    def __init__(self, queue: Queue[ReceivedMessage]) -> None:
+    def __init__(
+        self,
+        queue: queue.Queue[ReceivedMessage],
+        receive_monitor: "_ReceiveMonitor",
+    ) -> None:
         self._queue = queue
+        self._receive_monitor = receive_monitor
 
     def deliver(self, message: BusMessage) -> None:
         self._queue.put(message.received_view())
+        self._receive_monitor.notify_delivery()
+
+
+class _ReceiveMonitor:
+    _condition: threading.Condition
+
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+
+    def notify_delivery(self) -> None:
+        with self._condition:
+            self._condition.notify_all()
+
+    def receive_from(
+        self, receivers: tuple[_BrokerReceiver, ...]
+    ) -> tuple[Receiver, ReceivedMessage]:
+        received = None
+        with self._condition:
+            while received is None:
+                for receiver in receivers:
+                    message = receiver.receive_nowait()
+                    if message is not None:
+                        received = (receiver, message)
+                        break
+
+                if received is None:
+                    self._condition.wait()
+
+        return received

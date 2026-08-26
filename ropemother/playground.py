@@ -156,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-25T21:09:07+00:00"
+__date__ = "2026-08-26T16:33:54+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -7591,6 +7591,138 @@ def demo_delivery_ignores_disconnected_transport_subscription() -> None:
     print("\n")
 
 
+def demo_receive_from_selected_receiver() -> None:
+    print("Demo: endpoint factory receives from selected receivers")
+    bus = DirectMessageBus()
+    sink = InMemoryCaptureSink()
+    bus.set_capture_sink(sink)
+    first_receiver = bus.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_MSG_TYPE,
+    )
+    second_receiver = bus.subscribe(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    emitter = bus.register_emitter(
+        msg_topic=DEMO_TOPIC,
+        msg_producer=DEMO_PRODUCER,
+        msg_type=DEMO_ALT_MSG_TYPE,
+    )
+    canonical_payload = "selected receiver payload"
+    canonical_receiver = second_receiver
+
+    emitter.emit(canonical_payload)
+    received_receiver, received_message = bus.receive_from(
+        first_receiver, second_receiver
+    )
+    received_payload = received_message.payload
+
+    print(f"{canonical_payload=}")
+    print(f"{received_payload=}")
+    print(
+        "received_receiver_is_canonical="
+        f"{received_receiver is canonical_receiver}"
+    )
+
+    success = (
+        received_receiver is canonical_receiver
+        and received_payload == canonical_payload
+    )
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received selection " + eq_string + " canonical selection")
+
+    print(f"({type(bus).__name__}): ", end="")
+    if success:
+        print("Received from the selected endpoint with available data")
+    else:
+        print("Did not preserve the selected receiver and payload")
+    print("\n")
+
+
+async def demo_async_transport_receive_from_selected_receiver() -> None:
+    print("Demo: async transport client receives from selected receivers")
+    bus = AsyncDirectMessageBus(capture_mode=CaptureMode.TRANSPORT_ONLY)
+    format_registry = PortableFormatRegistry(JSON_PORTABLE_FORMAT)
+    producer_client, producer_session = _make_async_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=AsyncMemoryFrameConnection.make_pair(),
+    )
+    subscriber_client, subscriber_session = _make_async_transport_endpoint(
+        bus=bus,
+        format_registry=format_registry,
+        connections=AsyncMemoryFrameConnection.make_pair(),
+    )
+
+    registration_task = asyncio.create_task(
+        producer_client.register_emitter(
+            msg_topic=DEMO_TOPIC,
+            msg_producer=DEMO_PRODUCER,
+            msg_type=DEMO_ALT_MSG_TYPE,
+        )
+    )
+    await producer_session.handle_next_frame()
+    emitter = await registration_task
+
+    first_subscription_task = asyncio.create_task(
+        subscriber_client.subscribe(
+            msg_topic=DEMO_TOPIC,
+            msg_producer=DEMO_PRODUCER,
+            msg_type=DEMO_MSG_TYPE,
+        )
+    )
+    await subscriber_session.handle_next_frame()
+    first_receiver = await first_subscription_task
+
+    second_subscription_task = asyncio.create_task(
+        subscriber_client.subscribe(
+            msg_topic=DEMO_TOPIC,
+            msg_producer=DEMO_PRODUCER,
+            msg_type=DEMO_ALT_MSG_TYPE,
+        )
+    )
+    await subscriber_session.handle_next_frame()
+    second_receiver = await second_subscription_task
+    canonical_payload = "selected async transport payload"
+    canonical_receiver = second_receiver
+
+    emit_task = asyncio.create_task(emitter.emit(canonical_payload))
+    await producer_session.handle_next_frame()
+    await emit_task
+    received_receiver, received_message = await subscriber_client.receive_from(
+        first_receiver, second_receiver
+    )
+    received_payload = received_message.payload
+
+    print(f"{canonical_payload=}")
+    print(f"{received_payload=}")
+    print(
+        "received_receiver_is_canonical="
+        f"{received_receiver is canonical_receiver}"
+    )
+
+    success = (
+        received_receiver is canonical_receiver
+        and received_payload == canonical_payload
+    )
+    eq_string = "=="
+    if not success:
+        eq_string = "!="
+    print("received selection " + eq_string + " canonical selection")
+
+    print(f"({type(subscriber_client).__name__}): ", end="")
+    if success:
+        print("Received from the selected async transport endpoint")
+    else:
+        print("Did not preserve selected async receiver and payload")
+    print("\n")
+
+
 def run_all_demos() -> None:
     demo_basic_publish_subscribe()
     demo_capture_order()
@@ -7701,6 +7833,8 @@ def run_all_demos() -> None:
     demo_request_clients_keep_replies_separate()
     asyncio.run(demo_async_request_clients_keep_replies_separate())
     demo_delivery_ignores_disconnected_transport_subscription()
+    demo_receive_from_selected_receiver()
+    asyncio.run(demo_async_transport_receive_from_selected_receiver())
 
 
 if __name__ == "__main__":

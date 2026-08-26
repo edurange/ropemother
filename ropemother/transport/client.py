@@ -10,6 +10,7 @@ from typing import Any
 
 from ropemother.broker.endpoints import (
     Emitter,
+    InvalidReceiverSelectionError,
     Receiver,
     UnlistedMessageTypeError,
     UnsupportedTypeFormatError,
@@ -69,7 +70,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:39:10+00:00"
+__date__ = "2026-08-26T15:54:53+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -196,6 +197,14 @@ class TransportClient(MessageEndpointFactory):
         )
         return receiver
 
+    def receive_from(
+        self, *receivers: Receiver
+    ) -> tuple[Receiver, ReceivedMessage]:
+        selected_receivers = self._validate_receiver_selection(receivers)
+        receiver, frame = self._receive_delivery_from(selected_receivers)
+        message = self._received_message_from_frame(frame)
+        return receiver, message
+
     def _receive_expected_frame[T](self, expected_type: type[T]) -> T:
         while True:
             frame = self._channel.receive_frame()
@@ -238,6 +247,43 @@ class TransportClient(MessageEndpointFactory):
 
         return frame
 
+    def _receive_delivery_from(
+        self, receivers: tuple["TransportReceiver", ...]
+    ) -> tuple["TransportReceiver", DeliveryFrame]:
+        received = self._take_queued_delivery_from(receivers)
+        if received is None:
+            received = self._receive_relevant_delivery_from(receivers)
+        return received
+
+    def _take_queued_delivery_from(
+        self, receivers: tuple["TransportReceiver", ...]
+    ) -> tuple["TransportReceiver", DeliveryFrame] | None:
+        received = None
+        for receiver in receivers:
+            frame = self._take_queued_delivery_frame(receiver._subscription_id)
+            if frame is not None:
+                received = (receiver, frame)
+                break
+        return received
+
+    def _receive_relevant_delivery_from(
+        self, receivers: tuple["TransportReceiver", ...]
+    ) -> tuple["TransportReceiver", DeliveryFrame]:
+        receiver_by_subscription = {
+            receiver._subscription_id: receiver for receiver in receivers
+        }
+        subscription_ids = tuple(receiver_by_subscription)
+        delivery_frame = None
+
+        while delivery_frame is None:
+            frame = self._channel.receive_frame()
+            delivery_frame = self._handle_delivery_candidate(
+                frame, subscription_ids
+            )
+
+        receiver = receiver_by_subscription[delivery_frame.subscription_id]
+        return receiver, delivery_frame
+
     def _receive_delivery_frame(
         self, subscription_id: TransportSubscriptionID
     ) -> DeliveryFrame:
@@ -276,7 +322,7 @@ class TransportClient(MessageEndpointFactory):
         while True:
             frame = self._channel.receive_frame()
             delivery_frame = self._handle_delivery_candidate(
-                frame, subscription_id
+                frame, (subscription_id,)
             )
             if delivery_frame is not None:
                 return delivery_frame
@@ -291,13 +337,13 @@ class TransportClient(MessageEndpointFactory):
                 break
 
             delivery_frame = self._handle_delivery_candidate(
-                frame, subscription_id
+                frame, (subscription_id,)
             )
 
         return delivery_frame
 
     def _handle_delivery_candidate(
-        self, frame: Any, subscription_id: TransportSubscriptionID
+        self, frame: Any, subscription_ids: tuple[TransportSubscriptionID, ...]
     ) -> DeliveryFrame | None:
         delivery_frame = None
         if isinstance(frame, TransportErrorFrame):
@@ -307,7 +353,7 @@ class TransportClient(MessageEndpointFactory):
         elif isinstance(frame, RegistrationFrame):
             self._registrations.apply_registrations(frame.registrations)
         elif isinstance(frame, DeliveryFrame):
-            if frame.subscription_id == subscription_id:
+            if frame.subscription_id in subscription_ids:
                 delivery_frame = frame
             else:
                 self._queue_delivery_frame(frame)
@@ -356,6 +402,27 @@ class TransportClient(MessageEndpointFactory):
             reply_to=frame.reply_to,
         )
         return message
+
+    def _validate_receiver_selection(
+        self, receivers: tuple[Receiver, ...]
+    ) -> tuple["TransportReceiver", ...]:
+        if not receivers:
+            raise InvalidReceiverSelectionError(
+                "receive_from requires at least one receiver"
+            )
+
+        selected_receivers = []
+        for receiver in receivers:
+            if (
+                not isinstance(receiver, TransportReceiver)
+                or receiver._client is not self
+            ):
+                raise InvalidReceiverSelectionError(
+                    "receive_from requires receivers created by this client"
+                )
+            selected_receivers.append(receiver)
+
+        return tuple(selected_receivers)
 
     def _portable_format_table(self) -> PortableFormatRegistry:
         return self._format_registry

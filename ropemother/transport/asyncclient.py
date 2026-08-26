@@ -3,12 +3,13 @@
 
 """Asynchronous endpoint-side client facade for ropemother transport frames."""
 
-from collections import deque
+import collections
 import collections.abc
 import typing
 
 from ropemother.broker.asyncendpoints import AsyncEmitter, AsyncReceiver
 from ropemother.broker.endpoints import (
+    InvalidReceiverSelectionError,
     UnlistedMessageTypeError,
     UnsupportedTypeFormatError,
     reply_metadata_for,
@@ -64,10 +65,13 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T18:24:54+00:00"
+__date__ = "2026-08-26T16:02:09+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
+
+
+DeliveryDeque = collections.deque[DeliveryFrame]
 
 
 # Resolve undefined/ambiguous behavior around overlapping/simultaneous calls:
@@ -75,7 +79,7 @@ __status__ = "Development"
 class AsyncTransportClient(AsyncEndpointProvisioner):
     """Async endpoint factory backed by transport frames."""
     _channel: AsyncFrameChannel
-    _delivery_queues: dict[TransportSubscriptionID, deque[DeliveryFrame]]
+    _delivery_queues: dict[TransportSubscriptionID, DeliveryDeque]
     _format_registry: PortableFormatRegistry
     _registrations: EndpointRegistrationView
 
@@ -171,6 +175,14 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         )
         return receiver
 
+    async def receive_from(
+        self, *receivers: AsyncReceiver
+    ) -> tuple[AsyncReceiver, ReceivedMessage]:
+        selected_receivers = self._validate_receiver_selection(receivers)
+        receiver, frame = await self._receive_delivery_from(selected_receivers)
+        message = self._received_message_from_frame(frame)
+        return receiver, message
+
     async def _receive_expected_frame[T](self, expected_type: type[T]) -> T:
         while True:
             frame = await self._channel.receive_frame()
@@ -197,7 +209,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
 
     def _queue_delivery_frame(self, frame: DeliveryFrame) -> None:
         delivery_queue = self._delivery_queues.setdefault(
-            frame.subscription_id, deque()
+            frame.subscription_id, collections.deque()
         )
         delivery_queue.append(frame)
 
@@ -205,7 +217,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         self, subscription_id: TransportSubscriptionID
     ) -> DeliveryFrame | None:
         delivery_queue = self._delivery_queues.setdefault(
-            subscription_id, deque()
+            subscription_id, collections.deque()
         )
         frame = None
         if delivery_queue:
@@ -220,6 +232,43 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
             subscription_id, min_count=1, max_count=1
         )
         return frames[0]
+
+    async def _receive_delivery_from(
+        self, receivers: tuple["AsyncTransportReceiver", ...]
+    ) -> tuple["AsyncTransportReceiver", DeliveryFrame]:
+        received = self._take_queued_delivery_from(receivers)
+        if received is None:
+            received = await self._receive_relevant_delivery_from(receivers)
+        return received
+
+    def _take_queued_delivery_from(
+        self, receivers: tuple["AsyncTransportReceiver", ...]
+    ) -> tuple["AsyncTransportReceiver", DeliveryFrame] | None:
+        received = None
+        for receiver in receivers:
+            frame = self._take_queued_delivery_frame(receiver._subscription_id)
+            if frame is not None:
+                received = (receiver, frame)
+                break
+        return received
+
+    async def _receive_relevant_delivery_from(
+        self, receivers: tuple["AsyncTransportReceiver", ...]
+    ) -> tuple["AsyncTransportReceiver", DeliveryFrame]:
+        receiver_by_subscription = {
+            receiver._subscription_id: receiver for receiver in receivers
+        }
+        subscription_ids = tuple(receiver_by_subscription)
+        delivery_frame = None
+
+        while delivery_frame is None:
+            frame = await self._channel.receive_frame()
+            delivery_frame = self._handle_delivery_candidate(
+                frame, subscription_ids
+            )
+
+        receiver = receiver_by_subscription[delivery_frame.subscription_id]
+        return receiver, delivery_frame
 
     async def _receive_delivery_batch(
         self,
@@ -274,7 +323,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         while True:
             frame = await self._channel.receive_frame()
             delivery_frame = self._handle_delivery_candidate(
-                frame, subscription_id
+                frame, (subscription_id,)
             )
             if delivery_frame is not None:
                 return delivery_frame
@@ -289,13 +338,15 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
                 break
 
             delivery_frame = self._handle_delivery_candidate(
-                frame, subscription_id
+                frame, (subscription_id,)
             )
 
         return delivery_frame
 
     def _handle_delivery_candidate(
-        self, frame: typing.Any, subscription_id: TransportSubscriptionID
+        self,
+        frame: typing.Any,
+        subscription_ids: tuple[TransportSubscriptionID, ...],
     ) -> DeliveryFrame | None:
         delivery_frame = None
         if isinstance(frame, TransportErrorFrame):
@@ -305,7 +356,7 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         elif isinstance(frame, RegistrationFrame):
             self._registrations.apply_registrations(frame.registrations)
         elif isinstance(frame, DeliveryFrame):
-            if frame.subscription_id == subscription_id:
+            if frame.subscription_id in subscription_ids:
                 delivery_frame = frame
             else:
                 self._queue_delivery_frame(frame)
@@ -354,6 +405,27 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
             reply_to=frame.reply_to,
         )
         return message
+
+    def _validate_receiver_selection(
+        self, receivers: tuple[AsyncReceiver, ...]
+    ) -> tuple["AsyncTransportReceiver", ...]:
+        if not receivers:
+            raise InvalidReceiverSelectionError(
+                "receive_from requires at least one receiver"
+            )
+
+        selected_receivers = []
+        for receiver in receivers:
+            if (
+                not isinstance(receiver, AsyncTransportReceiver)
+                or receiver._client is not self
+            ):
+                raise InvalidReceiverSelectionError(
+                    "receive_from requires receivers created by this client"
+                )
+            selected_receivers.append(receiver)
+
+        return tuple(selected_receivers)
 
     def _portable_format_table(self) -> PortableFormatRegistry:
         return self._format_registry

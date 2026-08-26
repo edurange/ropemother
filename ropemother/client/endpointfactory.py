@@ -3,11 +3,13 @@
 
 """Synchronous factory helpers for bus endpoints and request/reply clients."""
 
+import abc
+
 from ropemother.bootstrap.policy import (
     DEFAULT_LIFECYCLE_TOPIC_ROOT,
     LifecycleMessageType,
 )
-from ropemother.broker.endpoints import Emitter, ReceiveEndpoint
+from ropemother.broker.endpoints import Emitter, ReceiveEndpoint, Receiver
 from ropemother.capture.history import MessageHistory
 from ropemother.capture.historyservice import HistoryClient, HistoryService
 from ropemother.client.endpointfactorybase import EndpointFactoryBase
@@ -26,10 +28,11 @@ from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
     PortableFormat,
 )
+from ropemother.message.records import ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:40:50+00:00"
+__date__ = "2026-08-26T16:24:27+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -51,6 +54,12 @@ class MessageEndpointFactory(
     ],
 ):
     """Synchronous factory for bus endpoints and request/reply clients."""
+
+    @abc.abstractmethod
+    def receive_from(
+        self, *receivers: Receiver
+    ) -> tuple[Receiver, ReceivedMessage]:
+        ...
 
     def create_lifecycle_publisher(
         self,

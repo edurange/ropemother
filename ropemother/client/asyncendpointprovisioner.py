@@ -34,6 +34,7 @@ from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
     PortableFormat,
 )
+from ropemother.message.records import ReceivedMessage
 from ropemother.message.selectors import (
     OptionalSymbolInput,
     SubscriptionTopicInput,
@@ -43,7 +44,7 @@ from ropemother.message.typeformats import SupportedTypeFormatsInput
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:38:20+00:00"
+__date__ = "2026-08-26T16:25:45+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -74,6 +75,12 @@ class AsyncEndpointProvisioner(abc.ABC):
         msg_producer: OptionalSymbolInput = None,
         msg_type: OptionalSymbolInput = None,
     ) -> AsyncReceiver:
+        ...
+
+    @abc.abstractmethod
+    async def receive_from(
+        self, *receivers: AsyncReceiver
+    ) -> tuple[AsyncReceiver, ReceivedMessage]:
         ...
 
     @abc.abstractmethod
@@ -366,6 +373,11 @@ class ImmediateAsyncEndpointProvisioner(AsyncEndpointProvisioner):
             msg_topic=msg_topic, msg_producer=msg_producer, msg_type=msg_type
         )
         return receiver
+
+    async def receive_from(
+        self, *receivers: AsyncReceiver
+    ) -> tuple[AsyncReceiver, ReceivedMessage]:
+        return await self._factory.receive_from(*receivers)
 
     def _portable_format_table(self) -> PortableFormatTable:
         return self._factory._portable_format_table()

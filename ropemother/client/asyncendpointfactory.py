@@ -3,6 +3,8 @@
 
 """Asynchronous factory helpers for bus endpoints and clients."""
 
+import abc
+
 from ropemother.bootstrap.policy import (
     DEFAULT_LIFECYCLE_TOPIC_ROOT,
     LifecycleMessageType,
@@ -29,10 +31,11 @@ from ropemother.format.portableformat import (
     JSON_PORTABLE_FORMAT,
     PortableFormat,
 )
+from ropemother.message.records import ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:38:11+00:00"
+__date__ = "2026-08-26T16:33:01+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -54,6 +57,12 @@ class AsyncMessageEndpointFactory(
     ],
 ):
     """Async factory for bus endpoints and request/reply clients."""
+
+    @abc.abstractmethod
+    async def receive_from(
+        self, *receivers: AsyncReceiver
+    ) -> tuple[AsyncReceiver, ReceivedMessage]:
+        ...
 
     def create_lifecycle_publisher(
         self,
