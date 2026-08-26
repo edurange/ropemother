@@ -2,6 +2,11 @@
 __pycache__/
 *.py[cod]
 
+# Python packaging outputs
+build/
+dist/
+*.egg-info/
+
 # OS and file-browser metadata
 .DS_Store
 ._*
