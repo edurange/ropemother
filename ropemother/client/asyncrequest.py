@@ -30,7 +30,7 @@ from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:38:34+00:00"
+__date__ = "2026-08-26T17:16:34+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -111,7 +111,7 @@ class AsyncRequester:
 class AsyncResponder:
     """Async helper that receives requests and sends replies."""
     _emitter: AsyncEmitter
-    _request_receiver: AsyncReceiver | None
+    request_receiver: AsyncReceiver | None
 
     def __init__(
         self,
@@ -119,15 +119,15 @@ class AsyncResponder:
         request_receiver: AsyncReceiver | None = None,
     ) -> None:
         self._emitter = emitter
-        self._request_receiver = request_receiver
+        self.request_receiver = request_receiver
 
     async def receive(self) -> ReceivedMessage:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        message = await self._request_receiver.receive()
+        message = await self.request_receiver.receive()
         if message.bus_operation != BusOperation.REQUEST:
             raise UnexpectedRequestMessageError(
                 "responder received a message that is not a request"
@@ -136,12 +136,12 @@ class AsyncResponder:
         return message
 
     def receive_nowait(self) -> ReceivedMessage | None:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        message = self._request_receiver.receive_nowait()
+        message = self.request_receiver.receive_nowait()
         if message is not None:
             if message.bus_operation != BusOperation.REQUEST:
                 raise UnexpectedRequestMessageError(
@@ -151,12 +151,12 @@ class AsyncResponder:
         return message
 
     def receive_available(self) -> list[ReceivedMessage]:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        messages = self._request_receiver.receive_available()
+        messages = self.request_receiver.receive_available()
         for message in messages:
             if message.bus_operation != BusOperation.REQUEST:
                 raise UnexpectedRequestMessageError(
@@ -166,12 +166,12 @@ class AsyncResponder:
         return messages
 
     async def receive_many(self, max_count: int) -> list[ReceivedMessage]:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        messages = await self._request_receiver.receive_many(max_count)
+        messages = await self.request_receiver.receive_many(max_count)
         for message in messages:
             if message.bus_operation != BusOperation.REQUEST:
                 raise UnexpectedRequestMessageError(

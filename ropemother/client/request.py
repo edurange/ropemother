@@ -21,7 +21,7 @@ from ropemother.message.records import BusOperation, ReceivedMessage
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:42:35+00:00"
+__date__ = "2026-08-26T17:14:51+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev7"
 __status__ = "Development"
@@ -178,7 +178,7 @@ class Requester:
 class Responder:
     """Low-level helper that receives requests and sends replies."""
     _emitter: Emitter
-    _request_receiver: Receiver | None
+    request_receiver: Receiver | None
 
     def __init__(
         self,
@@ -186,47 +186,47 @@ class Responder:
         request_receiver: Receiver | None = None,
     ) -> None:
         self._emitter = emitter
-        self._request_receiver = request_receiver
+        self.request_receiver = request_receiver
 
     def receive(self) -> ReceivedMessage:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        message = self._request_receiver.receive()
+        message = self.request_receiver.receive()
         self._validate_request_message(message)
         return message
 
     def receive_nowait(self) -> ReceivedMessage | None:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        message = self._request_receiver.receive_nowait()
+        message = self.request_receiver.receive_nowait()
         if message is not None:
             self._validate_request_message(message)
         return message
 
     def receive_available(self) -> list[ReceivedMessage]:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        messages = self._request_receiver.receive_available()
+        messages = self.request_receiver.receive_available()
         for message in messages:
             self._validate_request_message(message)
         return messages
 
     def receive_many(self, max_count: int) -> list[ReceivedMessage]:
-        if self._request_receiver is None:
+        if self.request_receiver is None:
             raise UnboundResponderError(
                 "responder does not have a request receiver"
             )
 
-        messages = self._request_receiver.receive_many(max_count)
+        messages = self.request_receiver.receive_many(max_count)
         for message in messages:
             self._validate_request_message(message)
         return messages
