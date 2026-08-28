@@ -2,7 +2,7 @@
 
 `ropemother` is a Python package for building small message-oriented systems. It provides publish-subscribe messaging, request/reply helpers, capture and history support, portable payload formats, an in-process direct broker, and a freestanding broker for communication between local processes.
 
-The current developer release is intended for teaching, research software, local development, and early integration work. The public interfaces are being developed around stable message boundaries so application code can remain largely independent of the transport and persistence mechanisms behind them.
+The current developer release is intended for teaching, research software, local development, and early integration work.
 
 ## Installation
 
@@ -20,15 +20,9 @@ The base package has no required third-party runtime dependencies. The explorato
 python -m pip install --pre "ropemother[zmq]"
 ```
 
-## Guided exercises
-
-A guided sequence for learning message-based design with the public `ropemother` interfaces is available at:
-
-<https://github.com/edurange/ropemother-exercises>
-
-The exercises begin with a 90-minute image reconstruction tutorial and continue through basic messaging, TTY processing, graph reachability, and a fuller image application. They are the recommended starting point for learning `ropemother` through a structured progression.
-
 ## Publish and subscribe
+
+The examples below introduce the main public messaging interfaces with small programs.
 
 A direct message bus can route a message from one emitter to every receiver whose subscription matches that message.
 
@@ -74,6 +68,8 @@ The direct broker is useful when the participating components can share one Pyth
 
 ## Running a freestanding broker
 
+A broker coordinates message delivery. The freestanding broker lets separate local processes connect to the same message bus.
+
 Start a local broker in one terminal:
 
 ```sh
@@ -88,6 +84,8 @@ broker URI: ropemother+unix:///...
 environment: ROPEMOTHER_CONNECTION_DESCRIPTOR=ropemother+unix:///...
 Press Ctrl-C to stop
 ```
+
+The connection descriptor identifies the broker endpoint that client processes use to find the same message bus.
 
 A client can connect using the printed descriptor explicitly:
 
@@ -105,7 +103,7 @@ from ropemother import connect_message_bus
 bus = connect_message_bus()
 ```
 
-Once connected, the client uses the same `register_emitter(...)`, `subscribe(...)`, `emit(...)`, and `receive()` operations as a direct bus.
+Once connected, client code elsewhere uses the same `register_emitter(...)`, `subscribe(...)`, `emit(...)`, and `receive()` operations as a direct bus.
 
 For example, a subscriber process can wait for one message:
 
@@ -196,7 +194,7 @@ A procedure client is callable and returns the reply payload. `client.call(...)`
 
 ## Capture and history
 
-Capture preserves the messages and registrations needed to interpret a run later. It is the normal posture for `ropemother` because history, replay-oriented tools, and later inspection depend on an interpretable message record.
+Capture records messages and the information needed to interpret them later.
 
 Small in-process applications can supply a capture sink when constructing a direct bus:
 
@@ -258,9 +256,7 @@ Application code queries the history service through the bus rather than opening
 
 ## Portable payloads
 
-A Python object that can be handed directly to another local queue is not automatically suitable for capture, replay, IPC, or another runtime. `ropemother` therefore distinguishes runtime payload values from their portable representations.
-
-The current package includes JSON and raw-byte portable formats and supports project-defined formats for application message families. Stable application boundaries should use deliberate message contracts rather than treating arbitrary Python objects or generic JSON structures as an implicit shared data model.
+Portable formats serialize payloads for capture and transport. `ropemother` includes JSON and raw-byte formats and supports project-defined formats for other application data.
 
 ## Using the source checkout
 
@@ -290,13 +286,19 @@ See `CONTRIBUTING.md` before preparing a substantial change.
 python -m ropemother.playground
 ```
 
-The playground is intentionally more verbose than the short examples in this README. It is a development surface rather than the guided learning sequence; use the exercise repository for participant-facing instruction.
+The playground is intentionally more verbose than the short examples in this README and is mainly useful for development and inspection.
+
+## Supplementary exercises
+
+Exercises and tutorial materials are available at:
+
+<https://github.com/edurange/ropemother-exercises>
 
 ## Development status
 
 `ropemother` is a developer release. The current implementation covers the local message model, direct and freestanding broker operation, portable payload formats, capture, history queries, and request/reply helpers.
 
-The project does not currently claim production distributed-broker deployment, distributed consensus ordering, complete replay orchestration, or archive-level storage integration. Those concerns should be added behind the message boundaries rather than assumed by application code using the current public interfaces.
+Interfaces may still change during the developer-release series.
 
 ## License
 
