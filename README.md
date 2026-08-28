@@ -1,16 +1,14 @@
-# ropemother
+# Ropemother
 
-This is a developer release of `ropemother`, a Python package for building small message-oriented systems. It provides a low-configuration direct broker, readable topic/type/producer names, capture support, portable payload formats, and request/reply helpers for simple local services.
+`ropemother` is a Python package for building small message-oriented systems. It provides publish-subscribe messaging, request/reply helpers, capture and history support, portable payload formats, an in-process direct broker, and a freestanding broker for communication between local processes.
 
-The direct broker is useful for local development, teaching, demos, and early integration work. It is not intended to be the final transport story for every deployment. The package is organized so code can begin against project-owned message concepts while leaving room for later transport adapters and stronger persistence infrastructure.
-
-This preview does not claim to provide distributed consensus, production broker deployment, complete replay orchestration, or archive-level storage integration. It focuses on the local message model, capture behavior, request/reply helpers, and readable examples that can be used while the broader service architecture is still taking shape.
+The current developer release is intended for teaching, research software, local development, and early integration work. The public interfaces are being developed around stable message boundaries so application code can remain largely independent of the transport and persistence mechanisms behind them.
 
 ## Installation
 
 `ropemother` requires Python 3.13 or newer.
 
-Install the current developer release from PyPI with:
+Install the current developer release from PyPI:
 
 ```sh
 python -m pip install --pre ropemother
@@ -22,52 +20,17 @@ The base package has no required third-party runtime dependencies. The explorato
 python -m pip install --pre "ropemother[zmq]"
 ```
 
-## Using the source checkout
+## Guided exercises
 
-Clone the repository into a workspace directory:
+A guided sequence for learning message-based design with the public `ropemother` interfaces is available at:
 
-```sh
-git clone https://github.com/edurange/ropemother.git
-cd ropemother
-```
+<https://github.com/edurange/ropemother-exercises>
 
-Install the development dependencies into the current environment:
-
-```sh
-python -m pip install -e ".[dev]"
-```
-
-Run preview commands from the repository root:
-
-```sh
-python -m ropemother.playground
-```
-
-Use the same working-directory setup for small scripts kept in the checkout:
-
-```sh
-python my_example.py
-```
-
-If an example also imports a companion source tree such as `intarsia`, keep the repositories next to each other and add the companion tree to `PYTHONPATH`:
-
-```text
-workspace/
-    ropemother/
-    intarsia/
-```
-
-```sh
-PYTHONPATH="$PWD:../intarsia" python my_example.py
-```
-
-The freestanding broker uses the same source-checkout setup. Its startup and client commands are shown later in this README.
+The exercises begin with a 90-minute image reconstruction tutorial and continue through basic messaging, TTY processing, graph reachability, and a fuller image application. They are the recommended starting point for learning `ropemother` through a structured progression.
 
 ## Publish and subscribe
 
-The direct broker routes a message from an emitter to every receiver whose subscription matches that message.
-
-This example keeps the emitter and receivers in one Python session so you can run it locally. In a larger application, the producer and subscribers may belong to different components.
+A direct message bus can route a message from one emitter to every receiver whose subscription matches that message.
 
 ```python
 from ropemother import DirectMessageBus, InMemoryCaptureSink
@@ -92,15 +55,10 @@ second_receiver = bus.subscribe(
     msg_type="type-garply",
 )
 
-canonical_payload = "hello from producer"
+emitter.emit("hello from producer")
 
-emitter.emit(canonical_payload)
-
-first_message = first_receiver.receive()
-second_message = second_receiver.receive()
-
-print(first_message.payload)
-print(second_message.payload)
+print(first_receiver.receive().payload)
+print(second_receiver.receive().payload)
 ```
 
 Expected output:
@@ -110,129 +68,19 @@ hello from producer
 hello from producer
 ```
 
-`producer-corge` identifies the component that produced the message. It does not identify either receiver.
+`msg_topic`, `msg_producer`, and `msg_type` describe the messages that an endpoint emits or receives. In the example, both receivers select messages produced by `producer-corge` on `foo-topic.events` with message type `type-garply`, so both receive the same broadcast message.
 
-Both receivers subscribed to messages from `producer-corge` on `foo-topic.events` with message type `type-garply`, so both receive the emitted payload.
-
-## A small request/reply service
-
-A service can be ordinary application code behind a message boundary. In this example, the service receives a string request, applies Python’s built-in `str.upper`, and sends the result back to the client.
-
-`ropemother` provides the request/reply structure: the client sends a request message, the service handles it, and the client receives the reply. `str.upper` is a stand-in here for some application functionality hosted at a messaging endpoint, possibly a non-local one.
-
-This is the first async example. The async code is here because the service must be waiting for a request while the client sends one and waits for the reply.
-
-This example puts the client and service in the same Python session so you can run both sides locally. In a larger application, the client side and service side would usually belong to different components. The important point is that the client does not call `str.upper` directly; it sends a request message across a message boundary.
-
-```python
-import asyncio
-
-from ropemother import AsyncDirectMessageBus, InMemoryCaptureSink
-
-bus = AsyncDirectMessageBus(capture_sink=InMemoryCaptureSink())
-
-# Client-side request endpoint
-client = bus.create_procedure_client(
-    request_topic="foo-topic.requests",
-    reply_topic="foo-topic.replies",
-    requester_producer="producer-corge",
-    responder_producer="producer-grault",
-    request_msg_type="type-garply",
-    reply_msg_type="type-waldo",
-)
-
-# Service-side request handler
-service = bus.create_procedure_service(
-    request_topic="foo-topic.requests",
-    reply_topic="foo-topic.replies",
-    requester_producer="producer-corge",
-    responder_producer="producer-grault",
-    request_msg_type="type-garply",
-    reply_msg_type="type-waldo",
-    handler=str.upper,
-)
-
-
-async def run_one_request_reply_exchange() -> str:
-    service_task = asyncio.create_task(service.handle())
-
-    received_payload = await client("hello")
-
-    await service_task
-
-    return received_payload
-
-
-received_payload = asyncio.run(run_one_request_reply_exchange())
-print(received_payload)
-```
-
-Expected output:
-
-```text
-HELLO
-```
-
-`foo-topic.requests` is where the service receives requests. `foo-topic.replies` is where the client receives replies. `producer-corge` identifies the requesting component, and `producer-grault` identifies the responding component. `type-garply` identifies the request message type, and `type-waldo` identifies the reply message type.
-
-`run_one_request_reply_exchange()` exists because the service handler and client call need to share one event loop. The service task waits for one request while the client sends `"hello"` and waits for the reply payload. The final `await service_task` lets the one-request service handler finish before the example exits.
-
-A procedure client is callable. Calling the client uses ordinary Python function arguments and returns the reply payload. `call(...)` provides the same payload-returning operation with an explicit method name. `call_reply(...)` returns the full reply message rather than just the procedure result, which should only be necessary for advanced applications.
-
-In the local example, both sides are visible. In application code, these responsibilities often separate.
-
-The service side owns the handler:
-
-```python
-service = bus.create_procedure_service(
-    request_topic="foo-topic.requests",
-    reply_topic="foo-topic.replies",
-    requester_producer="producer-corge",
-    responder_producer="producer-grault",
-    request_msg_type="type-garply",
-    reply_msg_type="type-waldo",
-    handler=str.upper,
-)
-```
-
-The client side owns the request:
-
-```python
-client = bus.create_procedure_client(
-    request_topic="foo-topic.requests",
-    reply_topic="foo-topic.replies",
-    requester_producer="producer-corge",
-    responder_producer="producer-grault",
-    request_msg_type="type-garply",
-    reply_msg_type="type-waldo",
-)
-
-received = await client("hello")
-
-# Use call_reply(...) when application code needs the reply message metadata.
-reply = await client.call_reply("hello")
-received_again = reply.payload
-```
+The direct broker is useful when the participating components can share one Python process. The same endpoint vocabulary is also used with the freestanding broker described below.
 
 ## Running a freestanding broker
 
-The earlier examples create an in-process direct broker:
-
-```python
-from ropemother import DirectMessageBus, InMemoryCaptureSink
-
-bus = DirectMessageBus(capture_sink=InMemoryCaptureSink())
-```
-
-For application-scale work, it will often be useful to run the bus as a freestanding broker and connect client processes to it.
-
-Start the broker in one terminal:
+Start a local broker in one terminal:
 
 ```sh
 python -m ropemother.service
 ```
 
-The broker prints both the explicit broker URI and an environment-variable form:
+The broker prints its connection descriptor and an environment-variable form that client processes can use:
 
 ```text
 Message bus broker is running
@@ -241,18 +89,30 @@ environment: ROPEMOTHER_CONNECTION_DESCRIPTOR=ropemother+unix:///...
 Press Ctrl-C to stop
 ```
 
-For teaching examples, copy the printed broker URI directly into the client code. Each client process uses that URI to find the broker.
-
-### Subscriber process
-
-Save this as `subscriber.py`, then run it in a second terminal. It waits for one message.
+A client can connect using the printed descriptor explicitly:
 
 ```python
 from ropemother import connect_message_bus
 
-broker_uri = "ropemother+unix:///..."
-bus = connect_message_bus(broker_uri)
+bus = connect_message_bus("ropemother+unix:///...")
+```
 
+If `ROPEMOTHER_CONNECTION_DESCRIPTOR` is already set in the environment, the descriptor can be omitted:
+
+```python
+from ropemother import connect_message_bus
+
+bus = connect_message_bus()
+```
+
+Once connected, the client uses the same `register_emitter(...)`, `subscribe(...)`, `emit(...)`, and `receive()` operations as a direct bus.
+
+For example, a subscriber process can wait for one message:
+
+```python
+from ropemother import connect_message_bus
+
+bus = connect_message_bus()
 receiver = bus.subscribe(
     msg_topic="foo-topic.events",
     msg_producer="producer-corge",
@@ -265,22 +125,12 @@ print(message.payload)
 bus.close()
 ```
 
-Run it while the broker is still running:
-
-```sh
-python subscriber.py
-```
-
-### Producer process
-
-Save this as `producer.py`, then run it in a third terminal.
+A separate producer process can publish the message:
 
 ```python
 from ropemother import connect_message_bus
 
-broker_uri = "ropemother+unix:///..."
-bus = connect_message_bus(broker_uri)
-
+bus = connect_message_bus()
 emitter = bus.register_emitter(
     msg_topic="foo-topic.events",
     msg_producer="producer-corge",
@@ -288,94 +138,95 @@ emitter = bus.register_emitter(
 )
 
 emitter.emit("hello from producer")
-
 bus.close()
 ```
 
-Run it with the same broker URI in the script:
+The broker allows the producer, subscriber, and other services to have independent process lifetimes while preserving the same application-facing message model.
 
-```sh
-python producer.py
-```
+## Request and reply
 
-As a deployment or convenience option, a process may also read the broker URI from the environment variable `ROPEMOTHER_CONNECTION_DESCRIPTOR` when no URI is provided:
+A request/reply service places an application operation behind a message boundary. The client sends a request and waits for the correlated reply instead of calling the service implementation directly.
+
+The following local example uses `str.upper` as the service operation:
 
 ```python
-from ropemother import connect_message_bus
+import asyncio
 
-bus = connect_message_bus()
+from ropemother import AsyncDirectMessageBus, InMemoryCaptureSink
+
+bus = AsyncDirectMessageBus(capture_sink=InMemoryCaptureSink())
+
+client = bus.create_procedure_client(
+    request_topic="foo-topic.requests",
+    reply_topic="foo-topic.replies",
+    requester_producer="producer-corge",
+    responder_producer="producer-grault",
+    request_msg_type="type-garply",
+    reply_msg_type="type-waldo",
+)
+
+service = bus.create_procedure_service(
+    request_topic="foo-topic.requests",
+    reply_topic="foo-topic.replies",
+    requester_producer="producer-corge",
+    responder_producer="producer-grault",
+    request_msg_type="type-garply",
+    reply_msg_type="type-waldo",
+    handler=str.upper,
+)
+
+
+async def run_one_request() -> str:
+    service_task = asyncio.create_task(service.handle())
+    result = await client("hello")
+    await service_task
+    return result
+
+
+print(asyncio.run(run_one_request()))
 ```
 
-Use that form when the environment is responsible for providing the connection descriptor.
-
-The subscriber prints:
+Expected output:
 
 ```text
-hello from producer
+HELLO
 ```
 
-With `DirectMessageBus`, the broker object is created inside the Python process. With `connect_message_bus()`, the Python process connects to the freestanding broker. The endpoint vocabulary stays the same: register an emitter, subscribe a receiver, emit a message, and receive a message.
+A procedure client is callable and returns the reply payload. `client.call(...)` provides the same payload-returning operation with an explicit method name, while `client.call_reply(...)` returns the full reply message when application code also needs its message metadata.
 
-## Capture, logging, and history
+## Capture and history
 
-Capture records the symbol registrations and messages that pass through the broker. It is the normal posture for `ropemother`, because later inspection, replay-oriented tools, and history queries only make sense when the run has preserved an interpretable message log.
+Capture preserves the messages and registrations needed to interpret a run later. It is the normal posture for `ropemother` because history, replay-oriented tools, and later inspection depend on an interpretable message record.
 
-For small local examples, the capture sink can be attached when the bus is constructed:
+Small in-process applications can supply a capture sink when constructing a direct bus:
 
 ```python
+from ropemother import DirectMessageBus, InMemoryCaptureSink
+
 bus = DirectMessageBus(capture_sink=InMemoryCaptureSink())
 ```
 
-Managed applications may create the bus before the final capture sink is ready:
-
-```python
-bus = DirectMessageBus()
-
-# Startup and registration work may happen here.
-
-bus.set_capture_sink(capture_sink)
-```
-
-This second form is intended for service-style startup, where the bus and its capture sink may have different readiness lifecycles. While capture is enabled but no sink is attached, the bus may perform limited bootstrap work, but ordinary emitted messages are rejected rather than delivered without capture.
-
-For the freestanding broker, the default command starts a local broker with capture enabled and writes captured records to `.ropemother/capture.jsonl`:
+The freestanding broker enables capture by default and writes JSON Lines records to `.ropemother/capture.jsonl`:
 
 ```sh
 python -m ropemother.service
 ```
 
-Use `--history` to start the broker's built-in history service, so application code can query captured message history:
+Use `--capture-path` to choose another capture file. Use `--transport-only` only when a local transport experiment explicitly does not need capture, history, or replay guarantees.
+
+History is the application-facing way to query captured messages. Start the broker with its built-in history service:
 
 ```sh
 python -m ropemother.service --history
 ```
 
-Use `--capture-path` to choose a different JSON Lines capture file.
-
-Use `--transport-only` only when you explicitly want a no-capture broker for local transport experiments. Transport-only mode routes messages without capture, history, or replay guarantees.
-
-History is the application-facing way to ask about prior messages. Most application code should not parse the capture JSON Lines file directly.
-
-Captured payloads are intended to be portable. A value that can be handed across an in-process receiver queue is not automatically a good persistent or cross-runtime payload. The preview includes basic JSON and raw-byte formats for adoption, prototyping, capture, and public-boundary interoperability; projects can add dedicated formats for their own message families later. Stable project interfaces should usually prefer narrow message contracts over treating generic JSON structures as the internal data model.
-
-## Query broker history from application code
-
-Start a freestanding broker and enable its built-in history service:
-
-```sh
-python -m ropemother.service --history
-```
-
-The broker prints a URI. Copy that URI into a client script.
-
-Save this as `history_query.py`:
+Then create the preconfigured client for that service:
 
 ```python
 from ropemother import connect_message_bus
 from ropemother.service import preconfigured_history_client
 
-broker_uri = "ropemother+unix:///..."
-bus = connect_message_bus(broker_uri)
+bus = connect_message_bus()
 
 emitter = bus.register_emitter(
     msg_topic="foo-topic.events",
@@ -394,14 +245,7 @@ page = history_client.select(
 )
 
 print(page.entries[0].payload)
-
 bus.close()
-```
-
-Run it with the broker's history service running:
-
-```sh
-python history_query.py
 ```
 
 Expected output:
@@ -410,28 +254,50 @@ Expected output:
 captured event
 ```
 
-The application code does not open the capture file and does not create the history service. It connects to the broker and sends a history request through the broker's built-in history service contract.
+Application code queries the history service through the bus rather than opening the capture file directly. `preconfigured_history_client(...)` supplies the fixed contract used by the broker's built-in history service. Applications that define a different history service can use the explicit history client and service constructors instead.
 
-`preconfigured_history_client(...)` is the local/default wiring helper for that built-in broker history profile. It supplies the fixed request topic, reply topic, producer names, message types, and payload formats used by `python -m ropemother.service --history`.
+## Portable payloads
 
-That helper does not create history by magic, and it is not the general custom-service API. It is a shortcut over `create_history_client(...)` for this one preconfigured service contract. Code that uses a custom history service should call `create_history_client(...)` directly with explicit topics, producers, message types, and payload formats. A custom service should be constructed on the service side with matching `create_history_service(...)` parameters.
+A Python object that can be handed directly to another local queue is not automatically suitable for capture, replay, IPC, or another runtime. `ropemother` therefore distinguishes runtime payload values from their portable representations.
 
-## Executable demos
+The current package includes JSON and raw-byte portable formats and supports project-defined formats for application message families. Stable application boundaries should use deliberate message contracts rather than treating arbitrary Python objects or generic JSON structures as an implicit shared data model.
 
-The `playground.py` file contains executable demonstrations of more `ropemother` behavior.
+## Using the source checkout
 
-The playground is intentionally more verbose than the README examples. It prints intermediate values, compares sent and received messages, and shows several feature combinations in one place. Use it when you want to see working examples beyond the short copy-paste sections above.
+Clone the repository and install its development dependencies into an environment chosen for development work:
 
-The playground is a preview-era teaching and validation file. Over time, smaller examples and formal tests should replace some of its responsibilities.
+```sh
+git clone https://github.com/edurange/ropemother.git
+cd ropemother
+python -m pip install -e ".[dev]"
+```
 
-## Preview status
+The source repository is available at:
 
-`ropemother` is a preview package. The current iteration focuses on the local message model, direct broker behavior, capture, request/reply helpers, history queries, and a freestanding broker process for local development.
+<https://github.com/edurange/ropemother>
 
-The preview does not claim to provide a production distributed broker, consensus ordering, complete replay orchestration, or final transport infrastructure.
+Issues are tracked at:
 
-The direct broker is useful for local development and early integration work. Code that uses `register_emitter(...)`, `subscribe(...)`, `emit(...)`, `receive()`, request/reply clients, and history clients should remain close to the intended public workflow as stronger transport and persistence pieces are added.
+<https://github.com/edurange/ropemother/issues>
+
+See `CONTRIBUTING.md` before preparing a substantial change.
+
+### Executable development demos
+
+`ropemother/playground.py` contains chronological executable demonstrations used for development, inspection, and smoke checking:
+
+```sh
+python -m ropemother.playground
+```
+
+The playground is intentionally more verbose than the short examples in this README. It is a development surface rather than the guided learning sequence; use the exercise repository for participant-facing instruction.
+
+## Development status
+
+`ropemother` is a developer release. The current implementation covers the local message model, direct and freestanding broker operation, portable payload formats, capture, history queries, and request/reply helpers.
+
+The project does not currently claim production distributed-broker deployment, distributed consensus ordering, complete replay orchestration, or archive-level storage integration. Those concerns should be added behind the message boundaries rather than assumed by application code using the current public interfaces.
 
 ## License
 
-`ropemother` is released under the MIT License. See LICENSE for details.
+Ropemother is released under the MIT License. See `LICENSE` for details.

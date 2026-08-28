@@ -36,6 +36,7 @@ dev = [
 [project.urls]
 Source = "https://github.com/edurange/ropemother"
 Issues = "https://github.com/edurange/ropemother/issues"
+Exercises = "https://github.com/edurange/ropemother-exercises"
 
 [tool.black]
 line-length = 79

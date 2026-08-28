@@ -22,5 +22,6 @@ Desktop.ini
 .vscode/
 
 # Local project notes and runtime state
+AUTHORING.md
 NOTES.md
 .ropemother/
