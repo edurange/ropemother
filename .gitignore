@@ -2,6 +2,9 @@
 __pycache__/
 *.py[cod]
 
+# Local Python environments
+.venv/
+
 # Python packaging outputs
 build/
 dist/
