@@ -1,8 +1,14 @@
-# Ropemother
+# ropemother
 
 `ropemother` is a Python package for building small message-oriented systems. It provides publish-subscribe messaging, request/reply helpers, capture and history support, portable payload formats, an in-process direct broker, and a freestanding broker for communication between local processes.
 
 The current developer release is intended for teaching, research software, local development, and early integration work.
+
+## Namesake
+
+This module is named in honor of Margaret Elaine Hamilton, Director of the Software Engineering Division at the MIT Instrumentation Laboratory, and the Raytheon staff who realized her work. Margaret was the lead systems architect and principal designer of the Apollo Guidance Computer, where she led over 100 scientists, mathematicians, programmers and technical staff. Her accomplishments earned her the superlative "the Mother of Software Engineering".
+
+The "Rope Mothers" refer to a team of highly skilled textile workers - also known as "LOLs" ("Little Old Ladies") - who hand-wove the Apollo Guidance Computer ROMs from fine enameled wire and ferrite beads. The work of Hamilton and the LOLs serve as a reminder that computer engineering is painstaking work that is achieved through deliberation, teamwork, and shared labor. The name `ropemother` is intended to memorialize and praise their contributions to computing, science, and modern civilization.
 
 ## Installation
 
@@ -302,4 +308,4 @@ Interfaces may still change during the developer-release series.
 
 ## License
 
-Ropemother is released under the MIT License. See `LICENSE` for details.
+ropemother is released under the MIT License. See `LICENSE` for details.
