@@ -8,7 +8,7 @@ from typing import Any
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-09-26T23:28:09+00:00"
+__date__ = "2026-09-27T22:04:26+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -18,6 +18,8 @@ _EXPORTS = {
     "COMPOSITE_PORTABLE_FORMAT": "ropemother.format.portableformat",
     "ConflictingPortableFormatError": "ropemother.format.formattable",
     "ConflictingPortableFormatRegistrationError": "ropemother.format.registry",
+    "DEFAULT_PORTABLE_FORMATS": "ropemother.format.defaults",
+    "default_portable_format_registry": "ropemother.format.defaults",
     "FormatRegistryError": "ropemother.format.registry",
     "JSON_PORTABLE_FORMAT": "ropemother.format.portableformat",
     "PortableFormat": "ropemother.format.portableformat",
@@ -31,8 +33,6 @@ _EXPORTS = {
     "RAW_BYTES_PORTABLE_FORMAT": "ropemother.format.portableformat",
     "UnknownPortableFormatError": "ropemother.format.formattable",
     "UnknownPortableFormatIDError": "ropemother.format.registry",
-    "default_portable_format_registry": "ropemother.format.defaults",
-    "default_portable_formats": "ropemother.format.defaults",
 }
 
 __all__ = list(_EXPORTS)

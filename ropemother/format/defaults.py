@@ -16,27 +16,24 @@ from ropemother.format.registry import PortableFormatRegistry
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:39:35+00:00"
+__date__ = "2026-09-27T22:03:51+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
 
 
-def default_portable_formats() -> tuple[PortableFormat, ...]:
-    """Return portable formats installed by the base ropemother runtime."""
-    formats = (
-        RAW_BYTES_PORTABLE_FORMAT,
-        JSON_PORTABLE_FORMAT,
-        COMPOSITE_PORTABLE_FORMAT,
-        PROCEDURE_INVOCATION_JSON_FORMAT,
-    )
-    return formats
+DEFAULT_PORTABLE_FORMATS = (
+    RAW_BYTES_PORTABLE_FORMAT,
+    JSON_PORTABLE_FORMAT,
+    COMPOSITE_PORTABLE_FORMAT,
+    PROCEDURE_INVOCATION_JSON_FORMAT,
+)
 
 
 def default_portable_format_registry(
     extra_formats: collections.abc.Iterable[PortableFormat] = (),
 ) -> PortableFormatRegistry:
     """Build a local format registry with default and application formats."""
-    registry = PortableFormatRegistry(*default_portable_formats())
+    registry = PortableFormatRegistry(*DEFAULT_PORTABLE_FORMATS)
     registry.install_formats(extra_formats)
     return registry
