@@ -3,15 +3,15 @@
 
 """Async task runner for servicing one broker transport session."""
 
-from collections.abc import Callable
-from asyncio import CancelledError, Task, create_task
+import collections
+import asyncio
 
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.transport.asyncsession import AsyncBrokerTransportSession
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-18T19:45:50+00:00"
+__date__ = "2026-10-03T03:30:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -39,16 +39,16 @@ class AsyncTransportSessionFailedError(
 class AsyncBrokerTransportSessionRunner:
     """Lifecycle runner for one async broker transport session."""
     _session: AsyncBrokerTransportSession
-    _close_connection: Callable[[], None] | None
+    _close_connection: collections.abc.Callable[[], None] | None
     _stop_requested: bool
-    _task: Task[None] | None
+    _task: asyncio.Task[None] | None
     _error: Exception | None
 
     def __init__(
         self,
         *,
         session: AsyncBrokerTransportSession,
-        close_connection: Callable[[], None] | None = None,
+        close_connection: collections.abc.Callable[[], None] | None = None,
     ) -> None:
         self._session = session
         self._close_connection = close_connection
@@ -62,7 +62,7 @@ class AsyncBrokerTransportSessionRunner:
                 "async broker transport session runner has already started"
             )
 
-        self._task = create_task(self.run())
+        self._task = asyncio.create_task(self.run())
 
     async def run(self) -> None:
         try:
@@ -72,29 +72,28 @@ class AsyncBrokerTransportSessionRunner:
                 except TimeoutError:
                     continue
         except EOFError:
-            self._stop_requested = True
-        except CancelledError:
-            stop_was_requested = self._stop_requested
-            self._stop_requested = True
-            if not stop_was_requested:
+            pass
+        except asyncio.CancelledError:
+            if not self._stop_requested:
                 raise
         except OSError as error:
-            stop_was_requested = self._stop_requested
-            self._stop_requested = True
-            if not stop_was_requested:
-                self._error = error
+            delivery_was_stopped = self._session._delivery_was_stopped()
+            if not self._stop_requested and not delivery_was_stopped:
+                self._record_error(error)
         except Exception as error:
-            self._error = error
-            self._stop_requested = True
+            self._record_error(error)
         finally:
+            delivery_error = self._session._delivery_failure()
+            if delivery_error is not None:
+                self._record_error(delivery_error)
+            self._stop_transport()
             self._session.close()
 
     def request_stop(self) -> None:
-        self._stop_requested = True
-        if self._close_connection is not None:
-            self._close_connection()
-        if self._task is not None:
-            self._task.cancel()
+        self._stop_transport()
+        task = self._task
+        if task is not None:
+            task.cancel()
 
     async def wait(self) -> None:
         task = self._task
@@ -106,3 +105,15 @@ class AsyncBrokerTransportSessionRunner:
             raise AsyncTransportSessionFailedError(
                 "async broker transport session runner failed"
             ) from self._error
+
+    def _record_error(self, error: Exception) -> None:
+        if self._error is None:
+            self._error = error
+
+    def _stop_transport(self) -> None:
+        if self._stop_requested:
+            return
+        self._stop_requested = True
+        close_connection = self._close_connection
+        if close_connection is not None:
+            close_connection()

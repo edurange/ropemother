@@ -20,7 +20,7 @@ from ropemother.util.typedid import TypedID
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T18:59:24+00:00"
+__date__ = "2026-10-02T18:20:19+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -97,6 +97,7 @@ class EmitFrame:
     bus_operation: BusOperation = BusOperation.PUBLISH
     correlation_id: CorrelationID | None = None
     reply_to: MessageID | None = None
+    request_reply_subscription_id: TransportSubscriptionID | None = None
     result_requested: bool = True
 
 
@@ -112,6 +113,7 @@ class SubscribeFrame:
     msg_topic: tuple[SubscriptionTopicSelector, ...]
     msg_producer: OptionalSymbolInput
     msg_type: OptionalSymbolInput
+    request_reply_subscription: bool = False
 
 
 @dataclass(frozen=True, kw_only=True)

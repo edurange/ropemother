@@ -1,4 +1,4 @@
-# ropemother
+# `ropemother`
 
 `ropemother` is a Python package for building small message-oriented systems. It provides publish-subscribe messaging, request/reply helpers, capture and history support, portable payload formats, an in-process direct broker, and a freestanding broker for communication between local processes.
 

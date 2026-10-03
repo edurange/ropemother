@@ -32,10 +32,13 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:38:44+00:00"
+__date__ = "2026-10-03T03:28:51+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
+
+
+_DELIVERY_QUEUE_CAPACITY = 64
 
 
 class AsyncBrokerTransportSession:
@@ -44,7 +47,13 @@ class AsyncBrokerTransportSession:
     _core: DirectBrokerCore
     _state: TransportSessionState
     _delivery_targets: list[BrokerDeliveryTarget]
-    _delivery_tasks: list[asyncio.Task[None]]
+    _delivery_queue: asyncio.Queue[
+        tuple[TransportSubscriptionID, BusMessage, asyncio.Future[None]]
+    ]
+    _delivery_waiters: set[asyncio.Future[None]]
+    _delivery_task: asyncio.Task[None] | None
+    _delivery_stopped: bool
+    _delivery_error: Exception | None
 
     def __init__(
         self, *, channel: AsyncFrameChannel, core: DirectBrokerCore
@@ -53,12 +62,26 @@ class AsyncBrokerTransportSession:
         self._core = core
         self._state = TransportSessionState()
         self._delivery_targets = []
-        self._delivery_tasks = []
+        self._delivery_queue = asyncio.Queue(maxsize=_DELIVERY_QUEUE_CAPACITY)
+        self._delivery_waiters = set()
+        self._delivery_task = None
+        self._delivery_stopped = False
+        self._delivery_error = None
 
     def close(self) -> None:
+        self._delivery_stopped = True
         for delivery_target in self._delivery_targets:
             self._core.remove_receiver(delivery_target=delivery_target)
         self._delivery_targets.clear()
+
+        for waiter in self._delivery_waiters:
+            if not waiter.done():
+                waiter.set_result(None)
+        self._delivery_waiters.clear()
+
+        delivery_task = self._delivery_task
+        if delivery_task is not None and not delivery_task.done():
+            delivery_task.cancel()
 
     async def handle_next_frame(self) -> None:
         frame = await self._channel.receive_frame()
@@ -79,6 +102,12 @@ class AsyncBrokerTransportSession:
                 error_message=f"Unsupported session frame: {frame_type}",
             )
             await self._channel.send_frame(error_frame)
+
+    def _delivery_was_stopped(self) -> bool:
+        return self._delivery_stopped
+
+    def _delivery_failure(self) -> Exception | None:
+        return self._delivery_error
 
     async def _handle_register_emitter_frame(
         self, frame: RegisterEmitterFrame
@@ -173,7 +202,10 @@ class AsyncBrokerTransportSession:
             msg_producer=frame.msg_producer,
             msg_type=frame.msg_type,
         )
-        subscription_id = self._state.add_subscription_binding(binding)
+        subscription_id = self._state.add_subscription_binding(
+            binding,
+            request_reply_subscription=frame.request_reply_subscription,
+        )
         delivery_target = _AsyncTransportDeliveryTarget(
             session=self, subscription_id=subscription_id
         )
@@ -204,6 +236,18 @@ class AsyncBrokerTransportSession:
         serialized_payload = SerializedPayload(
             format_id=frame.msg_format_id, payload_bytes=frame.payload_bytes
         )
+        if not self._state.request_reply_subscription_is_valid(frame):
+            if frame.result_requested:
+                error_message = "invalid request/reply subscription for emit"
+                error_frame = TransportErrorFrame(
+                    error_code="invalid_request_reply_subscription",
+                    error_message=error_message,
+                )
+                await self._channel.send_frame(error_frame)
+            return
+
+        message_id_observer = self._state.begin_request_emit(frame)
+
         try:
             message_id = self._core.emit_serialized_from(
                 binding=binding,
@@ -212,32 +256,77 @@ class AsyncBrokerTransportSession:
                 bus_operation=frame.bus_operation,
                 correlation_id=frame.correlation_id,
                 reply_to=frame.reply_to,
+                message_id_observer=message_id_observer,
             )
         except MessageBusBaseException as e:
+            self._state.finish_request_emit(discard_owner=True)
             if frame.result_requested:
                 await self._send_error_frame(e)
             return
 
+        self._state.finish_request_emit()
         await self._wait_for_delivery_tasks()
         if frame.result_requested:
             result_frame = EmitResultFrame(msg_id=message_id)
             await self._channel.send_frame(result_frame)
 
-    def _schedule_delivery(
+    def _deliver(
         self, *, subscription_id: TransportSubscriptionID, message: BusMessage
     ) -> None:
-        task = asyncio.create_task(
-            self._send_delivery_frame(
-                subscription_id=subscription_id, message=message
-            )
+        relevant = self._state.accept_delivery(
+            subscription_id=subscription_id, message=message
         )
-        self._delivery_tasks.append(task)
+        if not relevant or self._delivery_stopped:
+            return
+
+        self._ensure_delivery_task()
+        waiter = asyncio.get_running_loop().create_future()
+        try:
+            self._delivery_queue.put_nowait(
+                (subscription_id, message, waiter)
+            )
+        except asyncio.QueueFull:
+            self.close()
+            self._channel.close()
+            return
+
+        self._delivery_waiters.add(waiter)
+
+    def _ensure_delivery_task(self) -> None:
+        if self._delivery_task is None:
+            delivery_task = asyncio.create_task(self._run_deliveries())
+            delivery_task.add_done_callback(self._delivery_task_finished)
+            self._delivery_task = delivery_task
+
+    def _delivery_task_finished(
+        self, delivery_task: asyncio.Task[None]
+    ) -> None:
+        if delivery_task.cancelled():
+            return
+        error = delivery_task.exception()
+        if error is None:
+            return
+        self._delivery_error = error
+        self.close()
+        self._channel.close()
+
+    async def _run_deliveries(self) -> None:
+        while not self._delivery_stopped:
+            subscription_id, message, waiter = await self._delivery_queue.get()
+            try:
+                await self._send_delivery_frame(
+                    subscription_id=subscription_id, message=message
+                )
+            finally:
+                self._delivery_waiters.discard(waiter)
+                if not waiter.done():
+                    waiter.set_result(None)
+                self._delivery_queue.task_done()
 
     async def _wait_for_delivery_tasks(self) -> None:
-        tasks = self._delivery_tasks
-        self._delivery_tasks = []
-        for task in tasks:
-            await task
+        waiters = tuple(self._delivery_waiters)
+        for waiter in waiters:
+            await waiter
 
     async def _send_error_frame(self, error: MessageBusBaseException) -> None:
         error_frame = TransportErrorFrame(
@@ -270,7 +359,6 @@ class AsyncBrokerTransportSession:
         )
         await self._channel.send_frame(frame)
 
-
     def _supported_type_formats_from_frame(
         self, frame: RegisterEmitterFrame
     ) -> dict[str, tuple[PortableFormat, ...]]:
@@ -299,6 +387,6 @@ class _AsyncTransportDeliveryTarget(BrokerDeliveryTarget):
         self._subscription_id = subscription_id
 
     def deliver(self, message: BusMessage) -> None:
-        self._session._schedule_delivery(
+        self._session._deliver(
             subscription_id=self._subscription_id, message=message
         )

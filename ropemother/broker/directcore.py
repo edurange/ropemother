@@ -3,12 +3,12 @@
 
 """Shared implementation for in-process brokers."""
 
-from abc import ABC, abstractmethod
-from collections.abc import Iterable
-from dataclasses import dataclass
-from enum import Enum
-from time import monotonic_ns
-from typing import Any
+import abc
+import collections
+import dataclasses
+import enum
+import time
+import typing
 
 from ropemother.bootstrap.buffer import BootstrapBufferLimits
 from ropemother.bootstrap.policy import (
@@ -95,7 +95,7 @@ class UnsupportedRegistrationSourceError(
     pass
 
 
-class CaptureMode(Enum):
+class CaptureMode(enum.Enum):
     """Capture posture for a direct broker core."""
     CAPTURE_ENABLED = "capture-enabled"
     TRANSPORT_ONLY = "transport-only"
@@ -105,15 +105,15 @@ class CaptureMode(Enum):
         return self is CaptureMode.CAPTURE_ENABLED
 
 
-class BrokerDeliveryTarget(ABC):
+class BrokerDeliveryTarget(abc.ABC):
     """Receiver-side target that accepts broker-delivered messages."""
 
-    @abstractmethod
+    @abc.abstractmethod
     def deliver(self, message: BusMessage) -> None:
         ...
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class EmitterBinding:
     """Registered producer defaults used when emitting messages."""
     msg_topic: str
@@ -137,7 +137,7 @@ class EmitterBinding:
         return self.format_policy.resolve_msg_type(msg_type)
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclasses.dataclass(frozen=True, kw_only=True)
 class SubscriptionBinding:
     """Registered subscriber filter and delivery target."""
     subscription: Subscription
@@ -160,7 +160,7 @@ class DirectBrokerCore:
     def __init__(
         self,
         *,
-        extra_formats: Iterable[PortableFormat] = (),
+        extra_formats: collections.abc.Iterable[PortableFormat] = (),
         capture_enabled: bool = True,
         bootstrap_enabled: bool = False,
         bootstrap_policy: BootstrapPolicy | None = None,
@@ -360,7 +360,7 @@ class DirectBrokerCore:
         self._format_registry.install_format(payload_format)
 
     def install_formats(
-        self, payload_formats: Iterable[PortableFormat]
+        self, payload_formats: collections.abc.Iterable[PortableFormat]
     ) -> None:
         self._format_registry.install_formats(payload_formats)
 
@@ -379,7 +379,7 @@ class DirectBrokerCore:
         self,
         *,
         binding: EmitterBinding,
-        payload: Any,
+        payload: typing.Any,
         msg_type: str | None,
         payload_format: PortableFormat | None,
         bus_operation: BusOperation,
@@ -427,6 +427,7 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
+        message_id_observer: typing.Callable[[MessageID], None] | None = None,
     ) -> MessageID:
         resolved_msg_type = binding.resolve_msg_type(msg_type)
         resolved_msg_type_id = self._resolve_msg_type_id(
@@ -456,6 +457,7 @@ class DirectBrokerCore:
             bus_operation=bus_operation,
             correlation_id=correlation_id,
             reply_to=reply_to,
+            message_id_observer=message_id_observer,
         )
         return message_id
 
@@ -476,7 +478,7 @@ class DirectBrokerCore:
     def _emit(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         msg_format: PortableFormat,
         msg_format_id: PortableFormatID,
         msg_topic: str,
@@ -513,7 +515,7 @@ class DirectBrokerCore:
     def _deliver(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         serialized_payload: SerializedPayload,
         msg_topic: str,
         msg_type: str,
@@ -524,6 +526,7 @@ class DirectBrokerCore:
         bus_operation: BusOperation,
         correlation_id: CorrelationID | None = None,
         reply_to: MessageID | None = None,
+        message_id_observer: typing.Callable[[MessageID], None] | None = None,
     ) -> MessageID:
         message = self._build_message(
             payload=payload,
@@ -542,6 +545,8 @@ class DirectBrokerCore:
         matching_receivers = self._matching_receivers(message)
         self._ensure_bootstrap_message_allowed(message)
         self._capture_controller.write_message_record(message.captured_view())
+        if message_id_observer is not None:
+            message_id_observer(message.msg_id)
         for receiver in matching_receivers:
             receiver.deliver(message)
         return message.msg_id
@@ -557,7 +562,7 @@ class DirectBrokerCore:
     def _build_message(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         serialized_payload: SerializedPayload,
         msg_topic: str,
         msg_type: str,
@@ -584,7 +589,7 @@ class DirectBrokerCore:
             bus_operation=bus_operation,
             bus_sequence=bus_sequence,
             topic_sequence=topic_sequence,
-            bus_received_at=monotonic_ns(),
+            bus_received_at=time.monotonic_ns(),
             correlation_id=correlation_id,
             reply_to=reply_to,
         )
@@ -593,7 +598,7 @@ class DirectBrokerCore:
     def _serialize_payload(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         msg_format: PortableFormat,
         msg_format_id: PortableFormatID,
     ) -> SerializedPayload:
@@ -621,7 +626,7 @@ class DirectBrokerCore:
         *,
         serialized_payload: SerializedPayload,
         msg_format: PortableFormat,
-    ) -> Any:
+    ) -> typing.Any:
         try:
             payload = msg_format.decode(serialized_payload.payload_bytes)
         except (TypeError, ValueError) as e:

@@ -4,7 +4,7 @@
 """Transport frame codec for metadata plus opaque payload byte parts."""
 
 import json
-from typing import Any
+import typing
 
 from ropemother.capture.writer import RegistrationRecord
 from ropemother.exceptions import MessageBusBaseException
@@ -43,7 +43,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-14T19:01:32+00:00"
+__date__ = "2026-10-02T20:18:12+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -85,7 +85,7 @@ type TransportFrame = (
 )
 
 type FrameParts = tuple[bytes, ...]
-type Metadata = dict[str, Any]
+type Metadata = dict[str, typing.Any]
 
 
 def encode_frame(frame: TransportFrame) -> FrameParts:
@@ -391,6 +391,11 @@ def _encode_emit_frame(frame: EmitFrame) -> FrameParts:
     reply_to = None
     if frame.reply_to is not None:
         reply_to = int(frame.reply_to)
+    request_reply_subscription_id = None
+    if frame.request_reply_subscription_id is not None:
+        request_reply_subscription_id = int(
+            frame.request_reply_subscription_id
+        )
     metadata = {
         "frame_type": "emit",
         "msg_topic_id": int(frame.msg_topic_id),
@@ -400,6 +405,7 @@ def _encode_emit_frame(frame: EmitFrame) -> FrameParts:
         "bus_operation": frame.bus_operation.value,
         "correlation_id": correlation_id,
         "reply_to": reply_to,
+        "request_reply_subscription_id": request_reply_subscription_id,
         "result_requested": frame.result_requested,
     }
     return _payload_parts(metadata, frame.payload_bytes)
@@ -444,6 +450,14 @@ def _decode_emit_frame(
     reply_to = None
     if raw_reply_to is not None:
         reply_to = MessageID(raw_reply_to)
+    raw_request_reply_subscription_id = metadata.get(
+        "request_reply_subscription_id"
+    )
+    request_reply_subscription_id = None
+    if raw_request_reply_subscription_id is not None:
+        request_reply_subscription_id = TransportSubscriptionID(
+            raw_request_reply_subscription_id
+        )
     frame = EmitFrame(
         msg_topic_id=TopicID(metadata["msg_topic_id"]),
         msg_producer_id=ProducerID(metadata["msg_producer_id"]),
@@ -453,6 +467,7 @@ def _decode_emit_frame(
         bus_operation=bus_operation,
         correlation_id=correlation_id,
         reply_to=reply_to,
+        request_reply_subscription_id=request_reply_subscription_id,
         result_requested=bool(metadata.get("result_requested", True)),
     )
     return frame
@@ -597,6 +612,7 @@ def _encode_subscribe_frame(frame: SubscribeFrame) -> FrameParts:
         "msg_topic": topic_selectors,
         "msg_producer": frame.msg_producer,
         "msg_type": frame.msg_type,
+        "request_reply_subscription": frame.request_reply_subscription,
     }
     return _metadata_parts(metadata)
 
@@ -613,6 +629,9 @@ def _decode_subscribe_frame(
         msg_topic=tuple(topic_selectors),
         msg_producer=metadata["msg_producer"],
         msg_type=metadata["msg_type"],
+        request_reply_subscription=bool(
+            metadata.get("request_reply_subscription", False)
+        ),
     )
     return frame
 

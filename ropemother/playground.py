@@ -156,7 +156,7 @@ from ropemother.util.serializer import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-26T16:33:54+00:00"
+__date__ = "2026-10-03T00:51:49+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -7786,6 +7786,7 @@ def run_all_demos() -> None:
     demo_capture_bootstrap_lifecycle_facade()
     asyncio.run(demo_async_capture_bootstrap_lifecycle_facade())
     demo_broker_transport_session_emit_acknowledgement()
+    asyncio.run(demo_async_broker_transport_session_emit_acknowledgement())
     demo_transport_emit_reports_rejection()
     asyncio.run(demo_async_transport_emit_reports_rejection())
     demo_message_bus_service_capture_bootstrap()

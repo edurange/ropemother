@@ -3,15 +3,14 @@
 
 """Broker-side protocol session for one transport connection."""
 
+import queue
+import threading
+
 from ropemother.broker.directcore import BrokerDeliveryTarget, DirectBrokerCore
 from ropemother.exceptions import MessageBusBaseException
 from ropemother.format.formattable import UnknownPortableFormatError
 from ropemother.format.portableformat import PortableFormat
-from ropemother.message.records import (
-    BusMessage,
-    BusOperation,
-    SerializedPayload,
-)
+from ropemother.message.records import BusMessage, SerializedPayload
 from ropemother.message.selectors import SubscriptionTopicFilter
 from ropemother.transport.connection import FrameChannel
 from ropemother.transport.frames import (
@@ -34,10 +33,13 @@ from ropemother.transport.sessionstate import TransportSessionState
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-20T17:43:01+00:00"
+__date__ = "2026-10-02T20:08:02+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
+
+
+_DELIVERY_QUEUE_CAPACITY = 64
 
 
 class BrokerTransportSession:
@@ -46,6 +48,10 @@ class BrokerTransportSession:
     _core: DirectBrokerCore
     _state: TransportSessionState
     _delivery_targets: list[BrokerDeliveryTarget]
+    _delivery_queue: queue.Queue[
+        tuple[TransportSubscriptionID, BusMessage]
+    ] | None
+    _delivery_stopped: threading.Event
 
     def __init__(
         self, *, channel: FrameChannel, core: DirectBrokerCore
@@ -54,6 +60,8 @@ class BrokerTransportSession:
         self._core = core
         self._state = TransportSessionState()
         self._delivery_targets = []
+        self._delivery_queue = None
+        self._delivery_stopped = threading.Event()
 
     def close(self) -> None:
         for delivery_target in self._delivery_targets:
@@ -174,7 +182,10 @@ class BrokerTransportSession:
             msg_producer=frame.msg_producer,
             msg_type=frame.msg_type,
         )
-        subscription_id = self._state.add_subscription_binding(binding)
+        subscription_id = self._state.add_subscription_binding(
+            binding,
+            request_reply_subscription=frame.request_reply_subscription,
+        )
         delivery_target = _TransportDeliveryTarget(
             session=self, subscription_id=subscription_id
         )
@@ -207,6 +218,18 @@ class BrokerTransportSession:
         serialized_payload = SerializedPayload(
             format_id=frame.msg_format_id, payload_bytes=frame.payload_bytes
         )
+        if not self._state.request_reply_subscription_is_valid(frame):
+            if frame.result_requested:
+                error_message = "invalid request/reply subscription for emit"
+                error_frame = TransportErrorFrame(
+                    error_code="invalid_request_reply_subscription",
+                    error_message=error_message,
+                )
+                self._channel.send_frame(error_frame)
+            return
+
+        message_id_observer = self._state.begin_request_emit(frame)
+
         try:
             message_id = self._core.emit_serialized_from(
                 binding=binding,
@@ -215,12 +238,15 @@ class BrokerTransportSession:
                 bus_operation=frame.bus_operation,
                 correlation_id=frame.correlation_id,
                 reply_to=frame.reply_to,
+                message_id_observer=message_id_observer,
             )
         except MessageBusBaseException as e:
+            self._state.finish_request_emit(discard_owner=True)
             if frame.result_requested:
                 self._send_error_frame(e)
             return
 
+        self._state.finish_request_emit()
         if frame.result_requested:
             result_frame = EmitResultFrame(msg_id=message_id)
             self._channel.send_frame(result_frame)
@@ -231,11 +257,64 @@ class BrokerTransportSession:
         )
         self._channel.send_frame(error_frame)
 
+    def _enable_queued_delivery(self) -> None:
+        if self._delivery_queue is None:
+            self._delivery_queue = queue.Queue(
+                maxsize=_DELIVERY_QUEUE_CAPACITY
+            )
+
+    def _handle_next_delivery(self, timeout: float) -> bool:
+        delivery_queue = self._delivery_queue
+        if delivery_queue is None:
+            return False
+
+        try:
+            subscription_id, message = delivery_queue.get(timeout=timeout)
+        except queue.Empty:
+            return False
+
+        self._send_delivery_frame(
+            subscription_id=subscription_id, message=message
+        )
+        return True
+
+    def _deliver(
+        self, *, subscription_id: TransportSubscriptionID, message: BusMessage
+    ) -> None:
+        relevant = self._state.accept_delivery(
+            subscription_id=subscription_id, message=message
+        )
+        if not relevant:
+            return
+        self._enqueue_delivery(
+            subscription_id=subscription_id, message=message
+        )
+
+    def _enqueue_delivery(
+        self, *, subscription_id: TransportSubscriptionID, message: BusMessage
+    ) -> None:
+        if self._delivery_stopped.is_set():
+            return
+
+        delivery_queue = self._delivery_queue
+        if delivery_queue is None:
+            self._send_delivery_frame(
+                subscription_id=subscription_id, message=message
+            )
+            return
+
+        try:
+            delivery_queue.put_nowait((subscription_id, message))
+        except queue.Full:
+            self._delivery_stopped.set()
+            self.close()
+            self._channel.close()
+
+    def _delivery_was_stopped(self) -> bool:
+        return self._delivery_stopped.is_set()
+
     def _send_delivery_frame(
-        self,
-        *,
-        subscription_id: TransportSubscriptionID,
-        message: BusMessage,
+        self, *, subscription_id: TransportSubscriptionID, message: BusMessage
     ) -> None:
         registrations = self._state.registrations_to_send(
             self._core.registrations_for(message)
@@ -258,7 +337,6 @@ class BrokerTransportSession:
             reply_to=message.reply_to,
         )
         self._channel.send_frame(frame)
-
 
     def _supported_type_formats_from_frame(
         self, frame: RegisterEmitterFrame
@@ -288,6 +366,6 @@ class _TransportDeliveryTarget(BrokerDeliveryTarget):
         self._subscription_id = subscription_id
 
     def deliver(self, message: BusMessage) -> None:
-        self._session._send_delivery_frame(
+        self._session._deliver(
             subscription_id=self._subscription_id, message=message
         )

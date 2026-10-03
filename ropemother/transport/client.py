@@ -3,10 +3,9 @@
 
 """Endpoint-side client facade for ropemother transport frames."""
 
-from collections import deque
-from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import Any
+import collections
+import collections.abc
+import typing
 
 from ropemother.broker.endpoints import (
     Emitter,
@@ -19,6 +18,7 @@ from ropemother.broker.endpoints import (
 from ropemother.client.endpointfactory import MessageEndpointFactory
 from ropemother.client.request import (
     RequestClient,
+    RequestClientLimits,
     RequestService,
     Requester,
     Responder,
@@ -28,6 +28,7 @@ from ropemother.exceptions import (
     PayloadSerializationError,
 )
 from ropemother.format.defaults import default_portable_format_registry
+from ropemother.format.formattable import PortableFormatTableError
 from ropemother.format.portableformat import (
     PortableFormat,
     JSON_PORTABLE_FORMAT,
@@ -70,7 +71,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-26T15:54:53+00:00"
+__date__ = "2026-10-02T23:39:25+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -103,7 +104,9 @@ class TransportPayloadDecodeError(ValueError, TransportClientError):
 class TransportClient(MessageEndpointFactory):
     """Synchronous endpoint factory backed by transport frames."""
     _channel: FrameChannel
-    _delivery_queues: dict[TransportSubscriptionID, deque[DeliveryFrame]]
+    _delivery_queues: dict[
+        TransportSubscriptionID, collections.deque[DeliveryFrame]
+    ]
     _format_registry: PortableFormatRegistry
     _registrations: EndpointRegistrationView
 
@@ -111,7 +114,7 @@ class TransportClient(MessageEndpointFactory):
         self,
         *,
         channel: FrameChannel,
-        extra_formats: Iterable[PortableFormat] = (),
+        extra_formats: collections.abc.Iterable[PortableFormat] = (),
     ) -> None:
         self._channel = channel
         self._delivery_queues = {}
@@ -181,11 +184,69 @@ class TransportClient(MessageEndpointFactory):
         msg_producer: OptionalSymbolInput = None,
         msg_type: OptionalSymbolInput = None,
     ) -> "TransportReceiver":
+        receiver = self._subscribe(
+            msg_topic=msg_topic, msg_producer=msg_producer, msg_type=msg_type
+        )
+        return receiver
+
+    def create_requester(
+        self,
+        *,
+        request_topic: str,
+        reply_topic: OptionalSymbolInput,
+        requester_producer: str,
+        responder_producer: str,
+        request_msg_type: str,
+        reply_msg_type: str,
+        request_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
+        request_limits: RequestClientLimits | None = None,
+        request_type_formats: SupportedTypeFormatsInput | None = None,
+    ) -> Requester:
+        request_emitter = self.register_emitter(
+            msg_topic=request_topic,
+            msg_producer=requester_producer,
+            msg_type=request_msg_type,
+            payload_format=request_payload_format,
+            supported_type_formats=request_type_formats,
+        )
+        reply_receiver = self._subscribe(
+            msg_topic=reply_topic,
+            msg_producer=responder_producer,
+            msg_type=reply_msg_type,
+            request_reply_subscription=True,
+        )
+        request_emitter._set_request_reply_subscription(
+            reply_receiver._subscription_id
+        )
+        requester = self._make_requester(
+            request_emitter,
+            reply_receiver,
+            request_limits,
+        )
+        return requester
+
+    def receive_from(
+        self, *receivers: Receiver
+    ) -> tuple[Receiver, ReceivedMessage]:
+        selected_receivers = self._validate_receiver_selection(receivers)
+        receiver, frame = self._receive_delivery_from(selected_receivers)
+        message = self._received_message_from_frame(frame)
+        return receiver, message
+
+    def _subscribe(
+        self,
+        *,
+        msg_topic: SubscriptionTopicInput,
+        msg_producer: OptionalSymbolInput = None,
+        msg_type: OptionalSymbolInput = None,
+        request_reply_subscription: bool = False,
+    ) -> "TransportReceiver":
         msg_topic_filter = topic_filter_from_input(msg_topic)
         frame = SubscribeFrame(
             msg_topic=msg_topic_filter.selectors,
             msg_producer=msg_producer,
             msg_type=msg_type,
+            request_reply_subscription=request_reply_subscription,
         )
         self._channel.send_frame(frame)
 
@@ -196,14 +257,6 @@ class TransportClient(MessageEndpointFactory):
             client=self, subscription_id=response.subscription_id
         )
         return receiver
-
-    def receive_from(
-        self, *receivers: Receiver
-    ) -> tuple[Receiver, ReceivedMessage]:
-        selected_receivers = self._validate_receiver_selection(receivers)
-        receiver, frame = self._receive_delivery_from(selected_receivers)
-        message = self._received_message_from_frame(frame)
-        return receiver, message
 
     def _receive_expected_frame[T](self, expected_type: type[T]) -> T:
         while True:
@@ -231,7 +284,7 @@ class TransportClient(MessageEndpointFactory):
 
     def _queue_delivery_frame(self, frame: DeliveryFrame) -> None:
         delivery_queue = self._delivery_queues.setdefault(
-            frame.subscription_id, deque()
+            frame.subscription_id, collections.deque()
         )
         delivery_queue.append(frame)
 
@@ -239,7 +292,7 @@ class TransportClient(MessageEndpointFactory):
         self, subscription_id: TransportSubscriptionID
     ) -> DeliveryFrame | None:
         delivery_queue = self._delivery_queues.setdefault(
-            subscription_id, deque()
+            subscription_id, collections.deque()
         )
         frame = None
         if delivery_queue:
@@ -343,7 +396,9 @@ class TransportClient(MessageEndpointFactory):
         return delivery_frame
 
     def _handle_delivery_candidate(
-        self, frame: Any, subscription_ids: tuple[TransportSubscriptionID, ...]
+        self,
+        frame: typing.Any,
+        subscription_ids: tuple[TransportSubscriptionID, ...],
     ) -> DeliveryFrame | None:
         delivery_frame = None
         if isinstance(frame, TransportErrorFrame):
@@ -449,6 +504,7 @@ class TransportEmitter(Emitter):
     _msg_type: str
     _allow_unlisted_type_formats: bool
     _format_policy: TypeFormatPolicy
+    _request_reply_subscription_id: TransportSubscriptionID | None
 
     def __init__(
         self,
@@ -472,10 +528,11 @@ class TransportEmitter(Emitter):
         self._msg_type = msg_type
         self._allow_unlisted_type_formats = allow_unlisted_type_formats
         self._format_policy = format_policy
+        self._request_reply_subscription_id = None
 
     def emit(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
         payload_format: PortableFormat | None = None,
@@ -490,7 +547,7 @@ class TransportEmitter(Emitter):
 
     def emit_request(
         self,
-        payload: Any,
+        payload: typing.Any,
         *,
         correlation_id: CorrelationID,
         msg_type: str | None = None,
@@ -509,7 +566,7 @@ class TransportEmitter(Emitter):
     def emit_reply(
         self,
         request: ReceivedMessage,
-        payload: Any,
+        payload: typing.Any,
         *,
         msg_type: str | None = None,
         payload_format: PortableFormat | None = None,
@@ -528,7 +585,7 @@ class TransportEmitter(Emitter):
     def _emit_frame(
         self,
         *,
-        payload: Any,
+        payload: typing.Any,
         msg_type: str | None,
         payload_format: PortableFormat | None,
         bus_operation: BusOperation,
@@ -551,6 +608,9 @@ class TransportEmitter(Emitter):
             self._msg_producer
         )
         msg_format_id = self._format_id_for_emit(resolved_format)
+        request_reply_subscription_id = None
+        if bus_operation == BusOperation.REQUEST:
+            request_reply_subscription_id = self._request_reply_subscription_id
         frame = EmitFrame(
             msg_topic_id=msg_topic_id,
             msg_producer_id=msg_producer_id,
@@ -560,6 +620,7 @@ class TransportEmitter(Emitter):
             bus_operation=bus_operation,
             correlation_id=correlation_id,
             reply_to=reply_to,
+            request_reply_subscription_id=request_reply_subscription_id,
             result_requested=result_requested,
         )
         self._channel.send_frame(frame)
@@ -616,7 +677,7 @@ class TransportEmitter(Emitter):
         return response.format_id
 
     def _serialize_payload(
-        self, payload: Any, payload_format: PortableFormat
+        self, payload: typing.Any, payload_format: PortableFormat
     ) -> bytes:
         try:
             payload_bytes = payload_format.encode(payload)
@@ -633,6 +694,11 @@ class TransportEmitter(Emitter):
             )
 
         return payload_bytes
+
+    def _set_request_reply_subscription(
+        self, subscription_id: TransportSubscriptionID
+    ) -> None:
+        self._request_reply_subscription_id = subscription_id
 
 
 class TransportReceiver(Receiver):

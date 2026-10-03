@@ -15,6 +15,8 @@ from ropemother.broker.endpoints import (
     reply_metadata_for,
 )
 from ropemother.client.asyncendpointprovisioner import AsyncEndpointProvisioner
+from ropemother.client.asyncrequest import AsyncRequester
+from ropemother.client.request import RequestClientLimits
 from ropemother.exceptions import PayloadSerializationError
 from ropemother.format.defaults import default_portable_format_registry
 from ropemother.format.formattable import PortableFormatTableError
@@ -65,7 +67,7 @@ from ropemother.transport.frames import (
 
 __author__ = "Joe Granville"
 __email__ = "874605+jwgranville@users.noreply.github.com"
-__date__ = "2026-08-26T16:02:09+00:00"
+__date__ = "2026-10-02T20:04:03+00:00"
 __license__ = "MIT"
 __version__ = "0.1.0.dev10"
 __status__ = "Development"
@@ -159,11 +161,63 @@ class AsyncTransportClient(AsyncEndpointProvisioner):
         msg_producer: OptionalSymbolInput = None,
         msg_type: OptionalSymbolInput = None,
     ) -> "AsyncTransportReceiver":
+        receiver = await self._subscribe(
+            msg_topic=msg_topic,
+            msg_producer=msg_producer,
+            msg_type=msg_type,
+        )
+        return receiver
+
+    async def create_requester(
+        self,
+        *,
+        request_topic: str,
+        reply_topic: OptionalSymbolInput,
+        requester_producer: str,
+        responder_producer: str,
+        request_msg_type: str,
+        reply_msg_type: str,
+        request_payload_format: PortableFormat = JSON_PORTABLE_FORMAT,
+        request_limits: RequestClientLimits | None = None,
+        request_type_formats: SupportedTypeFormatsInput | None = None,
+    ) -> AsyncRequester:
+        request_emitter = await self.register_emitter(
+            msg_topic=request_topic,
+            msg_producer=requester_producer,
+            msg_type=request_msg_type,
+            payload_format=request_payload_format,
+            supported_type_formats=request_type_formats,
+        )
+        reply_receiver = await self._subscribe(
+            msg_topic=reply_topic,
+            msg_producer=responder_producer,
+            msg_type=reply_msg_type,
+            request_reply_subscription=True,
+        )
+        request_emitter._set_request_reply_subscription(
+            reply_receiver._subscription_id
+        )
+        requester = AsyncRequester(
+            request_emitter,
+            reply_receiver,
+            limits=request_limits,
+        )
+        return requester
+
+    async def _subscribe(
+        self,
+        *,
+        msg_topic: SubscriptionTopicInput,
+        msg_producer: OptionalSymbolInput = None,
+        msg_type: OptionalSymbolInput = None,
+        request_reply_subscription: bool = False,
+    ) -> "AsyncTransportReceiver":
         msg_topic_filter = topic_filter_from_input(msg_topic)
         frame = SubscribeFrame(
             msg_topic=msg_topic_filter.selectors,
             msg_producer=msg_producer,
             msg_type=msg_type,
+            request_reply_subscription=request_reply_subscription,
         )
         await self._channel.send_frame(frame)
 
@@ -452,6 +506,7 @@ class AsyncTransportEmitter(AsyncEmitter):
     _msg_type: str
     _allow_unlisted_type_formats: bool
     _format_policy: TypeFormatPolicy
+    _request_reply_subscription_id: TransportSubscriptionID | None
 
     def __init__(
         self,
@@ -475,6 +530,7 @@ class AsyncTransportEmitter(AsyncEmitter):
         self._msg_type = msg_type
         self._allow_unlisted_type_formats = allow_unlisted_type_formats
         self._format_policy = format_policy
+        self._request_reply_subscription_id = None
 
     async def emit(
         self,
@@ -554,6 +610,9 @@ class AsyncTransportEmitter(AsyncEmitter):
             self._msg_producer
         )
         msg_format_id = await self._format_id_for_emit(resolved_format)
+        request_reply_subscription_id = None
+        if bus_operation == BusOperation.REQUEST:
+            request_reply_subscription_id = self._request_reply_subscription_id
         frame = EmitFrame(
             msg_topic_id=msg_topic_id,
             msg_producer_id=msg_producer_id,
@@ -563,9 +622,15 @@ class AsyncTransportEmitter(AsyncEmitter):
             bus_operation=bus_operation,
             correlation_id=correlation_id,
             reply_to=reply_to,
+            request_reply_subscription_id=request_reply_subscription_id,
             result_requested=result_requested,
         )
         await self._channel.send_frame(frame)
+
+    def _set_request_reply_subscription(
+        self, subscription_id: TransportSubscriptionID
+    ) -> None:
+        self._request_reply_subscription_id = subscription_id
 
     async def _msg_type_id_for_emit(self, msg_type: str) -> MessageTypeID:
         msg_type_id = self._registrations.find_msg_type_id_for(msg_type)
